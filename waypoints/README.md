@@ -33,8 +33,11 @@ In `/config`, under Waypoints:
 | Pane | `auto`, `off` | `auto` |
 | Finished plan stays | `30 seconds`, `1 minute`, `3 minutes`, `10 minutes` | `1 minute` |
 | Managed plan | `auto`, `on`, `off` | `auto` |
+| Herdr status | `off`, `on` | `off` |
 
 `follow` takes [Agent-Pulse](../agent-pulse)'s own palette or animation, so the two bands never disagree, and falls back to `ember` / `subtle` when Agent-Pulse is not installed. Pick a value to stop following. Colour and shape show at every animation level; `off` keeps everything still, `subtle` pulses the running task, `full` also breathes the node and sweeps the route when the plan finishes. `Finished plan stays` is how long the band and the footer's `done ✓` stay after a plan finishes or is stopped, and when a pane Waypoints opened closes. `Pane: off` opens the pane only when you ask (`/waypoints` or `g`). A window narrower than 144 columns leaves an unasked pane waiting until it widens; `g` and `/waypoints` open it at any width. `Managed plan` is for Team and Enterprise plans; see [On a Team or Enterprise plan](#on-a-team-or-enterprise-plan).
+
+`Herdr status` is for Claude Code running in a Herdr terminal on Windows. Herdr shows an agent as needing you only when the program reports it, and Claude Code reports a turn that ends with a plan task still open as `done`, while the band says `⏸ paused, waiting on you`. With `on`, Waypoints reports that turn as needing you, so Herdr shows **Needs you** (and plays its sound) until you reply. It needs Windows PowerShell 5 or PowerShell 7 and herdr-core's `hc` on the PATH, and checks both when a session starts: if one is missing it says so once in a toast and does nothing. It stays quiet and does nothing in the Claude desktop app, outside Herdr, on macOS and Linux, for a sub-agent another agent runs with `hc`, while background work the turn started is still running, and after a turn stopped with Esc. While the mark is up, `hc send` to that terminal needs `--force`, as it would for a question.
 
 ## On a Team or Enterprise plan
 
@@ -88,6 +91,10 @@ The standing line is the one thing the global `CLAUDE.md` bullet used to do. If 
 For `auto`, anything but `off` turns it on. `/goal clear` (or `stop`, `off`, `cancel`, `end`, `none`, `reset`) stops the goal in the same way. If Claude Code will not give the mod the name `/waypoints`, it registers `/waypoints-mod` instead.
 
 In the band, the **all tasks** button (or `g`) opens the pane. `g` is a button in the band, so it only works while the band shows; `/waypoints` always does.
+
+## What changed in 2.6.0
+
+- **Herdr can show a paused plan as needing you.** A new setting, `Herdr status` (off by default). When a turn ends with a plan task still open, Herdr said the agent was done, then idle, while Waypoints said it was waiting on you. With the setting on, Waypoints reports that turn to Herdr as needing you; your reply clears it, as it does for a question. Windows only; see [Settings](#settings) for what it needs and where it stays off.
 
 ## What changed in 2.5.2
 

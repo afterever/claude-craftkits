@@ -640,3 +640,75 @@ not seen. A terminal has no `print` trait and is unchanged.
 
 Version **2.5.2**; test in `flow.test.ts` (a print session that draws is asked, one that draws nowhere is not, a teammate
 on a surface still is not).
+
+## 2.6.0: Herdr status, a paused plan reported as needing the person
+
+**The problem.** Herdr (a desktop app that hosts terminals) learns an agent's status only from the program's own
+OSC 7501 reports, and is told not to guess it from the screen. Claude Code reports `working`, `blocked` (a permission
+prompt, a question), `done` and `idle`, from its own state alone: a turn that ends with a plan task still open is `done`,
+and `idle` once the person looks, while the band says `⏸ paused, waiting on you`. Seen live on Claude Code 2.1.318: a
+session that planned two tasks and finished one read `done` in Herdr with the band paused; an `AskUserQuestion` read
+`blocked` within 2 s. No mod call sets the program status (`$.ui.status` is a line under the prompt, `$.ui.notify` a
+terminal notification Herdr does not document reading).
+
+**Options weighed.** A Herdr mod reading a label Waypoints sets (`hc label`) works, but fixes only the panels that mod
+draws (not the tab and space dots, not the sound) and puts half the change in another repository. A reminder at the end of
+the turn so Claude asks with `AskUserQuestion` reverses 2.2.0's "no reminder hook" and puts a dialog over the band. The
+person wanted Waypoints alone to do it, opt in.
+
+**The fix.** With `herdr: on`, when a main turn ends on a paused plan that waits on the person (`shouldMark`: an open,
+unparked task; not stopped with Esc; nothing in the Stop hook's `background_tasks`), Waypoints writes one report of its
+own: `ESC ] 7501 ; state=blocked:app=claude-code:kind=question:msg=<base64> BEL`, the fields Claude Code's own encoder
+writes. Claude's next report (the person types, work resumes) replaces it, so nothing clears it; a plan still paused after
+that turn is marked again.
+
+The report must reach the console Claude draws in. A child of the Bash tool has a console of its own (its process list
+did not hold Claude's pid), and text it writes there goes nowhere; a `$.process.run` child was only seen to work end to
+end through the attach below, not measured on its own. So a PowerShell child calls `FreeConsole`, then
+`AttachConsole` on the terminal's foreground pid (from `hc get`), and writes the report to `CONOUT$`; a marker written
+that way showed on the terminal's screen. Windows PowerShell 5 (.NET Framework) refuses to open a device such as `CONOUT$`
+as a `FileStream`, so both shells open it with `CreateFileW` and `WriteFile`.
+
+**Every assumption is checked**, in three places:
+- `hostBlocker` at session start: Windows; a terminal session (`isInteractive` and `surface === 'terminal'`; the desktop
+  app is an SDK host, neither); a Herdr terminal (`HC_TERMINAL_ID` set). These only log: the setting is one for the machine,
+  shared with sessions it cannot apply to.
+- The probe at session start, beside `session.start` rather than in it: `powershell.exe`, else `pwsh.exe`, must answer in
+  `FullLanguage` mode (`Add-Type` is refused in ConstrainedLanguage) and find `hc`. A Herdr terminal that fails it gets one
+  toast naming why.
+- The mark script, when it runs: not a sub-agent (a terminal with a `parent` is driven by `hc send`, which refuses a
+  `blocked` terminal without `--force`); Claude reports there (`status.app === 'claude-code'`); the terminal's program
+  (its root or foreground pid) is one of the script's own ancestors, walked through `Win32_Process.ParentProcessId`
+  (`HC_TERMINAL_ID` is inherited: an editor started from a Herdr terminal carries it into its own terminals, and a
+  session there would otherwise mark the Herdr one; seen: a mark run from outside Claude's tree says
+  `skip not-this-terminal` on both shells); the report has settled
+  (the same status record three reads running, a second apart: Claude sends the turn's `msg` a few seconds after `done`,
+  with the same `status_ms`, and that report would replace one written earlier); and it is still `done` or `idle`.
+  The hook waits `MARK_DELAY_MS` (3 s) first, since `classic.Stop` can land after `turn.complete`, and any later turn
+  cancels the mark (`markSeq`).
+
+**Safe with any task text.** The script travels as one argv element with no double quote in it, and the message goes in
+as char codes (`[string]::new([char[]](…))`), so no text of the plan is parsed as code. The script sets
+`[Console]::OutputEncoding` to UTF-8 first: Windows PowerShell 5 decodes a native program's output in the console's code
+page, and on a machine whose code page is not UTF-8 `ConvertFrom-Json` failed on `hc get` once the status message held
+`·` or `—` (seen), which Waypoints' own message does, so every re-mark would have failed.
+
+**Seen live** (Windows 11, Claude Code 2.1.318, herdr-core in Herdr): from bash, both shells marked a paused session
+`blocked` with a message of quotes, `$`, a backtick and accented text intact; the mark held for 2 minutes with the plan
+open and cleared to `working` on a reply. Through the branch's own hook (`--plugin-dir`, `herdr: on`): the probe logged
+`Herdr status on (powershell.exe, PowerShell 5)`; the turn read `done` at 14 s, its `msg` at 16 s, `blocked` with
+`Waypoints: waiting on you · next beta` at 21 s; a reply turned it `working`, then `done`, then `blocked` again 6 s later.
+
+**Limits.**
+- Windows only. macOS and Linux would write the report to the tty of Claude's process, untested here.
+- Managed mode has no Stop, so no `background_tasks`: a paused plan with work still running is marked too early there.
+- It relies on Claude Code reporting only when its own state changes. A build that repeats `done` would replace the mark,
+  and Herdr would show `done` again, as before.
+- It reports as `app=claude-code` and `kind=question` with no dialog open: `hc send` then needs `--force`, and Herdr plays
+  its "needs you" sound after its "done" one.
+
+**2.2.0 still holds**: Claude is never reminded or asked anything; only Herdr is told.
+
+Version **2.6.0**; tests in `herdr.test.ts` (the gates, the probe, the message, the script's quoting, and through the
+hooks: off by default, both shells, no shell, a locked-down one, outside Herdr, macOS, the desktop app, background work,
+a new turn first, a finished plan, Esc).
