@@ -27,6 +27,7 @@ import { rolesOf, resolveLook } from './palette.mjs'
 import { drawBand, drawPane, statsLine, label, FULL_MS } from './draw.mjs'
 import { createAutoPane } from './pane.mjs'
 import { OTHERS_MS, shownPath, pickPrunable, deleteArgv } from './prune.mjs'
+import { SHELLS, MARK_DELAY_MS, hostBlocker, probeArgv, parseProbe, probeBlocker, shouldMark, markMessage, markArgv } from './herdr.mjs'
 
 const DIR = '/.claude/mods-data/waypoints'
 const PANE = 'waypoints'
@@ -53,7 +54,9 @@ let callsWithoutPlan = 0
 let pendingGoal = null
 let paneUp = false // the pane is open (placed or waiting), from $.ui.panes() and ui.close
 const autoPane = createAutoPane() // when the pane opens and closes by itself
-let options = { palette: 'follow', animation: 'follow', pane: 'auto', linger: LINGER_DEFAULT, managed: 'auto' }
+let options = { palette: 'follow', animation: 'follow', pane: 'auto', linger: LINGER_DEFAULT, managed: 'auto', herdr: 'off' }
+let herdr = { ready: false, exe: '' } // the herdr setting: ready once the PowerShell probe passed (herdr.mjs)
+let markSeq = 0 // bumped by each turn: a pending Herdr mark whose turn is gone does nothing
 let interactive = true // session.start's isInteractive: false under -p and in an SDK host (the Desktop app); then only a drawing surface means someone watches the bar
 let asked = false // managed mode: the standing ask went out with a prompt this session
 let seen = null // the main turn watched for a managed plan's guard: { compose, stop, done }
@@ -399,8 +402,59 @@ async function judge($) {
   else $.ui.toast('Waypoints: a Team or Enterprise guard skips some of its hooks. Set Managed plan to on in /config to stop the notices')
 }
 
+// Herdr status (herdr.mjs): at session start, check every prerequisite once. The host's
+// own (Windows, a terminal session, a Herdr terminal) only go to the log: the setting is
+// shared with sessions it cannot apply to. A Herdr terminal whose PowerShell cannot do it
+// gets one toast, since the person asked for this there.
+async function checkHerdr($, e) {
+  herdr = { ready: false, exe: '' }
+  const terminalId = await $.env.get('HC_TERMINAL_ID')
+  const host = hostBlocker({ option: options.herdr, win, interactive, surface: e.surface, terminalId })
+  if (host === 'off') return
+  if (host) {
+    $.ui.log(`waypoints: Herdr status left out (${host})`)
+    return
+  }
+  let why = ''
+  for (const exe of SHELLS) {
+    let p = null
+    try {
+      const r = await $.process.run(probeArgv(exe), { timeoutMs: 15000 })
+      p = parseProbe(r.stdout)
+    } catch {
+      // not installed: try the next one
+    }
+    const blocker = probeBlocker(p)
+    if (!blocker) {
+      herdr = { ready: true, exe }
+      $.ui.log(`waypoints: Herdr status on (${exe}, PowerShell ${p.ps})`)
+      return
+    }
+    if (p && !why) why = blocker
+  }
+  why = why || 'neither powershell.exe nor pwsh.exe runs'
+  $.ui.log(`waypoints: Herdr status left out (${why})`)
+  $.ui.toast(`Waypoints: Herdr status is on, but ${why}`)
+}
+
+// A paused plan's turn just ended: mark Herdr once the Stop hook's background list has
+// landed, unless another turn started or the plan moved on meanwhile
+function markHerdr($) {
+  const seq = markSeq
+  $.clock.after(MARK_DELAY_MS, async () => {
+    if (seq !== markSeq || !herdr.ready || !shouldMark(G, waiting)) return
+    try {
+      const r = await $.process.run(markArgv(herdr.exe, markMessage(G, mask)), { timeoutMs: 30000 })
+      const out = String(r.stdout || '').trim()
+      if (out !== 'ok' && !out.startsWith('ok ')) $.ui.log(`waypoints: Herdr status not marked (${clip(out || `exit ${r.exitCode}`, 120)})`)
+    } catch (err) {
+      $.ui.log(`waypoints: Herdr status not marked (${clip(String(err && err.message ? err.message : err), 120)})`)
+    }
+  })
+}
+
 export function register(on, opts) {
-  options = { palette: 'follow', animation: 'follow', pane: 'auto', linger: LINGER_DEFAULT, managed: 'auto', ...(opts || {}) }
+  options = { palette: 'follow', animation: 'follow', pane: 'auto', linger: LINGER_DEFAULT, managed: 'auto', herdr: 'off', ...(opts || {}) }
   // on: leave out the hooks a managed plan's guard skips; auto: watch for it; off: neither
   const managed = options.managed === 'on'
   const watching = options.managed !== 'on' && options.managed !== 'off'
@@ -444,6 +498,7 @@ export function register(on, opts) {
       if (paneUp || wasUp || (G && (G.status === 'running' || isRecent(G)))) $.ui.invalidate('ui.render')
     })
     $.clock.every(10000, () => readRecording($).catch(() => {}))
+    checkHerdr($, e).catch(() => {})
     return next(e)
   })
 
@@ -529,6 +584,7 @@ export function register(on, opts) {
       G.finishedBy = ''
     }
     waiting = []
+    if (!e.agentId) markSeq += 1
     if (G && G.status === 'running') {
       G.active = true
       G.interrupted = false
@@ -622,6 +678,7 @@ export function register(on, opts) {
       // managed mode: no attachment row says the check ran, so look for its verdict now
       if (managed && G.status === 'running' && G.kind === 'goal' && !e.isAborted) onCheck($, null, now, LATE_WAITS).catch(() => {})
       $.ui.invalidate('ui.render')
+      if (herdr.ready && shouldMark(G, waiting)) markHerdr($)
     }
     return r
   })

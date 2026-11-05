@@ -1,7 +1,7 @@
 {
   "name": "waypoints",
   "displayName": "Waypoints",
-  "version": "2.5.2",
+  "version": "2.6.0",
   "description": "A route for /goal and any multi-step work, built from Claude's own task plan: the plan drawn as a line of nodes and legs above the prompt, an ETA at the goal's own pace, a pane that opens by itself with the whole task trail, and every chat's goal in /waypoints. Follows Agent-Pulse's palette and animation. Claude is asked to plan by the mod itself. Fork of Nate Herk's goal-meter 1.0.0.",
   "author": {
     "name": "afterever"
@@ -66,6 +66,16 @@
         "auto",
         "on",
         "off"
+      ]
+    },
+    "herdr": {
+      "type": "string",
+      "title": "Herdr status",
+      "description": "For Claude Code in a Herdr terminal on Windows: on makes Herdr show Needs you when a turn ends with a plan task still open (Herdr otherwise says done). Needs Windows PowerShell 5 or PowerShell 7 and herdr-core's hc; Waypoints checks both when a session starts. Off by default",
+      "default": "off",
+      "options": [
+        "off",
+        "on"
       ]
     }
   },
