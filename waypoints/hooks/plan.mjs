@@ -97,6 +97,48 @@ const SIZE_WORDS = { S: 'S', M: 'M', L: 'L', SMALL: 'S', MEDIUM: 'M', LARGE: 'L'
 // A bare S, M or L after "size": is the one slip callers make (it is not JSON). Quote it.
 const BARE_SIZE = /("size"\s*:\s*)([SMLsml])(?=\s*[,}\]])/g
 
+// JSON text with every bare size quoted, and how many were
+function quoteSizes(text) {
+  let n = 0
+  const fixed = text.replace(BARE_SIZE, (_, key, letter) => {
+    n += 1
+    return `${key}"${letter.toUpperCase()}"`
+  })
+  return { fixed, n }
+}
+
+// When the model's whole call is not valid JSON, Claude Code does not run the tool on
+// it: it passes { __unparsedToolInput: { raw, len } }, with the call's text in `raw`
+// (seen live 2026-11-06, claude 2.1.319). Without this the tool finds no action and no
+// tasks and answers "no plan in this chat yet", hiding why. Returns { input, repaired,
+// error }: the call read as the model meant it (after the same bare-size repair), or an error.
+export function readCall(input) {
+  const wrapped = input && input.__unparsedToolInput
+  if (wrapped === undefined || wrapped === null) return { input, repaired: 0, error: '' }
+  const text = String(typeof wrapped === 'string' ? wrapped : wrapped.raw ?? '').trim()
+  const bad = (why) => ({
+    input,
+    repaired: 0,
+    error: `the call was not valid JSON, so none of it was read: ${why}. Send it again with every value in quotes, e.g. { "action": "plan", "tasks": [{ "title": "...", "size": "S" }] }.`,
+  })
+  let parsed
+  let repaired = 0
+  try {
+    parsed = JSON.parse(text)
+  } catch (first) {
+    const { fixed, n } = quoteSizes(text)
+    try {
+      parsed = JSON.parse(fixed)
+      repaired = n
+    } catch {
+      return bad(first.message)
+    }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return bad('it is not a JSON object')
+  const { __unparsedToolInput, ...rest } = input
+  return { input: { ...rest, ...parsed }, repaired, error: '' }
+}
+
 // Reads the tasks a caller sent. Returns { list, repaired, error }. A caller is a
 // model writing JSON by hand, so bad input is expected and is answered, never guessed:
 // anything wrong gives an error naming it and an empty list, so no half-read plan
@@ -113,10 +155,10 @@ export function parseTasks(raw) {
       try {
         items = JSON.parse(text)
       } catch (first) {
-        const fixed = text.replace(BARE_SIZE, (_, key, letter) => `${key}"${letter.toUpperCase()}"`)
+        const { fixed, n } = quoteSizes(text)
         try {
           items = JSON.parse(fixed)
-          repaired = (text.match(BARE_SIZE) || []).length
+          repaired = n
         } catch {
           return bad(`tasks must be a JSON array of { "title": "...", "size": "S" | "M" | "L" }; it could not be read: ${first.message}`)
         }

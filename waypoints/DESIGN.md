@@ -744,3 +744,33 @@ second text grammar is more for the caller to get wrong. `normalizeTasks` stays 
 
 Version **2.7.0**; tests in `plan.test.ts` (the repair and its report, unreadable JSON, per-task errors, defaults and
 words, the count line, plain text, the 60 cut).
+
+## 2.7.1: a call the host could not parse is read, not lost
+
+**What 2.7.0 missed.** There are two ways the same slip reaches the tool. In one, the call is valid JSON and the `tasks`
+value is a string holding bad JSON: `parseTasks` handles that. In the other, the model's *whole call* is not valid JSON
+(`"tasks": [{"title":"A","size":S}]`, with no string around it). Claude Code then does not run the tool on fields at all.
+The tool's input becomes
+
+```json
+{ "__unparsedToolInput": { "raw": "{\"action\": \"plan\", \"tasks\": [...]}", "len": 109 } }
+```
+
+(read from a live session's log on 2026-11-06, Claude Code 2.1.319; `raw` is the call's text and `len` its length). With no
+`action` and no `tasks`, `serveTool` fell to the "no plan in this chat yet" reply: silent about the cause, the same failure
+as 2.7.0 fixed one layer down.
+
+**The rule.** `readCall(input)` in `plan.mjs`, called first in `serveTool`, returns `{ input, repaired, error }`:
+
+- A plain call (no wrapper) is returned as it is.
+- A wrapped call is parsed from `raw`; if that fails, the same bare-size repair as `parseTasks` is tried (`quoteSizes`, now
+  shared). The parsed fields are merged over the host's own (`tool`, `tool_use_id`, `agentId`), so a sub-agent's `by` still
+  works. The reply starts with `Repaired n unquoted sizes in the call`.
+- If it still does not parse, or is not an object, the reply says `the call was not valid JSON, so none of it was read`,
+  shows the parser's message and an example call with every value quoted. Nothing changes in the plan.
+
+**Not done.** No repair beyond bare sizes, here or in `parseTasks`: a trailing comma, a missing quote or a cut-off call is
+the model's to resend. `raw` may be cut when the call is very long; that parses as an error, not a half plan.
+
+Version **2.7.1**; tests in `plan.test.ts` (read and repaired, valid but wrapped, unreadable) and `flow.test.ts` (through
+the hooks, with the exact wrapper shape).
