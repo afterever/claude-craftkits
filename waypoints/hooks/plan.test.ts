@@ -145,6 +145,68 @@ test('the first plan and a plain add are not revisions', async () => {
   expect(g.tasks.some((t: any) => t.rev)).toBe(false)
 })
 
+// ---------- tasks that are not valid: answered, never guessed ----------
+
+function fresh() {
+  return newGoal({ sessionId: 's1', condition: 'x', now: 0, cwd: '' })
+}
+
+test('tasks given as JSON text with an unquoted size are repaired, and the reply says so', async () => {
+  const g = fresh()
+  const r = applyAction(g, { action: 'plan', tasks: '[{"title":"A","size":S},{"title":"B","size":m}]' }, { now: 1000 })
+  expect(r.ok).toBe(true)
+  expect(g.tasks.map((t: any) => [t.title, t.size])).toEqual([['A', 'S'], ['B', 'M']])
+  expect(r.text.split('\n')[0]).toBe('Planned 2 tasks. Repaired 2 unquoted sizes (write "size":"S", with quotes).')
+})
+
+test('tasks that cannot be read as JSON are an error, not one task titled with the text', async () => {
+  const g = fresh()
+  const r = applyAction(g, { action: 'plan', tasks: '[{"title":"A","size":"S"},{"title":"B",}]' }, { now: 1000 })
+  expect(r.ok).toBe(false)
+  expect(r.text).toContain('tasks must be a JSON array')
+  expect(r.text).toContain('could not be read')
+  expect(g.tasks).toHaveLength(0)
+  expect(g.planAt).toBe(0)
+  // a JSON object is not a list either
+  expect(applyAction(g, { action: 'plan', tasks: '{"title":"A"}' }, { now: 1000 }).ok).toBe(false)
+})
+
+test('each task is checked, and the error names the task and the field, and plans nothing', async () => {
+  const g = fresh()
+  const r = applyAction(g, { action: 'plan', tasks: [{ title: 'fine', size: 'S' }, { title: 'big', size: 'XL' }, { size: 'S' }, 5] }, { now: 1000 })
+  expect(r.ok).toBe(false)
+  expect(r.text).toContain('task 2 ("big") has size "XL"; use "S", "M" or "L"')
+  expect(r.text).toContain('task 3 needs a non-empty "title"')
+  expect(r.text).toContain('task 4 is not a { title, size } object')
+  expect(r.text).toContain('Nothing was planned.')
+  expect(g.tasks).toHaveLength(0)
+})
+
+test('a missing size is M, the size words work, and a plan or add reply starts with the count', async () => {
+  const g = fresh()
+  const r = applyAction(g, { action: 'plan', tasks: [{ title: 'a' }, { title: 'b', size: 'large' }, 'c'] }, { now: 1000 })
+  expect(g.tasks.map((t: any) => t.size)).toEqual(['M', 'L', 'M'])
+  expect(r.text.split('\n')[0]).toBe('Planned 3 tasks.')
+  expect(applyAction(g, { action: 'add', tasks: [{ title: 'd' }] }, { now: 2000 }).text.split('\n')[0]).toBe('Added 1 task.')
+  // the other actions have no count line
+  expect(applyAction(g, { action: 'done', id: 1 }, { now: 3000 }).text.startsWith('Plan:')).toBe(true)
+})
+
+test('plain text is still one task a line, and the first-task title still names a plan', async () => {
+  const g = fresh()
+  applyAction(g, { action: 'plan', tasks: '- first step\n- second step' }, { now: 1000 })
+  expect(g.tasks.map((t: any) => t.title)).toEqual(['first step', 'second step'])
+  expect(planSubject({ tasks: '[{"title":"Named","size":S}]' })).toBe('Named')
+})
+
+test('a plan over 60 tasks keeps the first 60 and says so', async () => {
+  const g = fresh()
+  const many = Array.from({ length: 63 }, (_, i) => ({ title: 't' + i, size: 'S' }))
+  const r = applyAction(g, { action: 'plan', tasks: many }, { now: 1000 })
+  expect(g.tasks).toHaveLength(60)
+  expect(r.text.split('\n')[0]).toBe('Planned 60 tasks. Kept the first 60; 3 more were left out.')
+})
+
 // ---------- what Claude is asked ----------
 
 test('the tool offers park, and every ask carries the two rules', async () => {

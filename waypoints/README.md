@@ -92,6 +92,10 @@ For `auto`, anything but `off` turns it on. `/goal clear` (or `stop`, `off`, `ca
 
 In the band, the **all tasks** button (or `g`) opens the pane. `g` is a button in the band, so it only works while the band shows; `/waypoints` always does.
 
+## What changed in 2.7.0
+
+- **A bad `tasks` list is answered, not guessed.** If Claude sends the list as text that is not valid JSON (the usual slip is an unquoted size, `"size":S`), Waypoints used to make one task titled with the whole text, and the bar read `0 of 1`. Now a bare `S`, `M` or `L` is quoted and the reply says it repaired it; any other mistake is an error naming the task and the field, and nothing is planned. A size such as `XL` is an error too, where it used to become `M`. A plan or add reply now starts with a count (`Planned 7 tasks.`), so Claude can see what was understood.
+
 ## What changed in 2.6.0
 
 - **Herdr can show a paused plan as needing you.** A new setting, `Herdr status` (off by default). When a turn ends with a plan task still open, Herdr said the agent was done, then idle, while Waypoints said it was waiting on you. With the setting on, Waypoints reports that turn to Herdr as needing you; your reply clears it, as it does for a question. Windows only; see [Settings](#settings) for what it needs and where it stays off.
