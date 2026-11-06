@@ -110,12 +110,13 @@ function quoteSizes(text) {
 // When the model's whole call is not valid JSON, Claude Code does not run the tool on
 // it: it passes { __unparsedToolInput: { raw, len } }, with the call's text in `raw`
 // (seen live 2026-11-06, claude 2.1.319). Without this the tool finds no action and no
-// tasks and answers "no plan in this chat yet", hiding why. Returns { input, repaired,
-// error }: the call read as the model meant it (after the same bare-size repair), or an error.
+// tasks and answers "no plan in this chat yet", hiding why. Sometimes the wrapper is
+// itself a string, the JSON text of { raw, len }, so a wrapper is unwrapped until what is
+// left is the call. Returns { input, repaired, error }: the call read as the model meant
+// it (after the same bare-size repair), or an error.
 export function readCall(input) {
-  const wrapped = input && input.__unparsedToolInput
+  let wrapped = input && input.__unparsedToolInput
   if (wrapped === undefined || wrapped === null) return { input, repaired: 0, error: '' }
-  const text = String(typeof wrapped === 'string' ? wrapped : wrapped.raw ?? '').trim()
   const bad = (why) => ({
     input,
     repaired: 0,
@@ -123,18 +124,25 @@ export function readCall(input) {
   })
   let parsed
   let repaired = 0
-  try {
-    parsed = JSON.parse(text)
-  } catch (first) {
-    const { fixed, n } = quoteSizes(text)
+  for (let depth = 0; depth < 4; depth++) {
+    const text = String(typeof wrapped === 'string' ? wrapped : wrapped.raw ?? '').trim()
     try {
-      parsed = JSON.parse(fixed)
-      repaired = n
-    } catch {
-      return bad(first.message)
+      parsed = JSON.parse(text)
+    } catch (first) {
+      const { fixed, n } = quoteSizes(text)
+      try {
+        parsed = JSON.parse(fixed)
+        repaired += n
+      } catch {
+        return bad(first.message)
+      }
     }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return bad('it is not a JSON object')
+    // { raw } with no action is another wrapper, not the call
+    if (typeof parsed.raw === 'string' && parsed.action === undefined) wrapped = parsed
+    else break
   }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return bad('it is not a JSON object')
+  if (typeof parsed.raw === 'string' && parsed.action === undefined) return bad('it is wrapped too deeply')
   const { __unparsedToolInput, ...rest } = input
   return { input: { ...rest, ...parsed }, repaired, error: '' }
 }

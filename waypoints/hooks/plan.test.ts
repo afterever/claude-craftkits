@@ -229,6 +229,25 @@ test('a wrapped call that cannot be read is an error saying so, not "no plan yet
   expect(readCall(wrapped('[1,2]')).error).toContain('not a JSON object')
 })
 
+// the second shape seen live: the wrapper is a string holding the JSON text of { raw, len }
+const doubleWrapped = (raw: string) => ({ tool: TOOL, tool_use_id: 'x', __unparsedToolInput: JSON.stringify({ raw, len: raw.length }) })
+
+test('a wrapper that is a string holding { raw, len } is unwrapped to the call, not taken for it', async () => {
+  const bare = readCall(doubleWrapped('{"action": "plan", "goal": "g", "tasks": [{"title":"A","size":S}]}'))
+  expect(bare.error).toBe('')
+  expect(bare.repaired).toBe(1)
+  expect(bare.input.action).toBe('plan')
+  expect(bare.input.raw).toBeUndefined()
+  // the call that was read as a successful "show" before: a trailing comma is an error, said so
+  const comma = readCall(doubleWrapped('{"action": "add", "tasks": [{"title":"A","size":"S"},{"title":"B",}]}'))
+  expect(comma.error).toContain('the call was not valid JSON, so none of it was read')
+  // deeper wrapping is read, and a loop of wrappers is stopped
+  const deep = readCall({ tool: TOOL, __unparsedToolInput: JSON.stringify({ raw: JSON.stringify({ raw: '{"action":"show"}' }) }) })
+  expect(deep.input.action).toBe('show')
+  const endless = readCall({ tool: TOOL, __unparsedToolInput: { raw: '{"raw":"{\\"raw\\":\\"{\\\\\\"raw\\\\\\":\\\\\\"{\\\\\\\\\\\\\\"raw\\\\\\\\\\\\\\":\\\\\\\\\\\\\\"x\\\\\\\\\\\\\\"}\\\\\\"}\\"}"}' } })
+  expect(endless.error).toContain('wrapped too deeply')
+})
+
 test('a plan over 60 tasks keeps the first 60 and says so', async () => {
   const g = fresh()
   const many = Array.from({ length: 63 }, (_, i) => ({ title: 't' + i, size: 'S' }))

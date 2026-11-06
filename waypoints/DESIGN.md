@@ -774,3 +774,27 @@ the model's to resend. `raw` may be cut when the call is very long; that parses 
 
 Version **2.7.1**; tests in `plan.test.ts` (read and repaired, valid but wrapped, unreadable) and `flow.test.ts` (through
 the hooks, with the exact wrapper shape).
+
+## 2.7.2: a call wrapped twice is unwrapped
+
+**What 2.7.1 missed.** The live test of 2.7.1 (a fresh session, `C:\bats`, 2026-11-06) showed the wrapper in two shapes, read from
+the session log:
+
+```json
+{ "__unparsedToolInput": { "raw": "{\"action\": \"plan\", ...}", "len": 109 } }
+{ "__unparsedToolInput": "{\"raw\": \"{\\\"action\\\": \\\"add\\\", ...}\", \"len\": 73}" }
+```
+
+The first is an object, the second a *string* holding the JSON text of `{ raw, len }`. `readCall` took the string for the call:
+it parsed to `{ raw, len }`, a valid object with no `action`, so `serveTool` read it as `show` and listed the plan. A call that
+should have been an error looked like a success, which is worse than 2.7.0's silence because it names a plan as unchanged
+when the caller meant to change it.
+
+**The rule.** `readCall` loops (four levels at most): parse the text; if the result is an object with a string `raw` and no
+`action`, it is another wrapper, so read its `raw`; otherwise it is the call. The bare-size repair runs at any level and the
+count adds up. More than four levels, or a non-object, is the same "not valid JSON" error.
+
+**Why `raw` and no `action` is the test.** A real call never has a `raw` field and the tool takes none, so a `raw` string with
+no `action` can only be a wrapper.
+
+Version **2.7.2**; tests in `plan.test.ts` and `flow.test.ts`, built from the shapes above. Both fail on 2.7.1's `plan.mjs`.

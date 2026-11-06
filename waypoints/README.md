@@ -92,6 +92,10 @@ For `auto`, anything but `off` turns it on. `/goal clear` (or `stop`, `off`, `ca
 
 In the band, the **all tasks** button (or `g`) opens the pane. `g` is a button in the band, so it only works while the band shows; `/waypoints` always does.
 
+## What changed in 2.7.2
+
+- **A call wrapped twice is unwrapped.** In 2.7.1's live test, a call with a trailing comma reached the tool as a string holding `{"raw": "...", "len": n}`. Waypoints took that for the call itself, found no action in it, and listed the plan as if all were well, with no error. It now keeps unwrapping until it reaches the call, then reads it or says it was not valid JSON.
+
 ## What changed in 2.7.1
 
 - **A whole call that is not valid JSON is read, or answered.** When Claude writes the call itself badly (an unquoted size, a trailing comma), Claude Code does not pass the fields to the tool; it passes the call's text wrapped as `__unparsedToolInput`. Waypoints found no action and no tasks in that and answered "no plan in this chat yet", hiding the cause. Now the text is read as the call: a bare `S`, `M` or `L` is quoted and the reply says it repaired it, and anything else gets a reply saying the call was not valid JSON and that nothing was read. 2.7.0 only covered a `tasks` value that arrives as text inside a valid call.
