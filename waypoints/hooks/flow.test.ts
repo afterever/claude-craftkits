@@ -212,6 +212,16 @@ test('a call the host wrapped as unparsed input is read, repaired and counted, o
   expect(ok.result).toContain('Plan: 0 of 2 tasks done')
 })
 
+test('a call wrapped as a string holding { raw, len } gets the error, not a plain plan listing', async ($, on) => {
+  world(on)
+  await start($)
+  const send = (raw: string, n: number) => $.tool.call({ tool: TOOL, tool_use_id: 'd' + n, __unparsedToolInput: JSON.stringify({ raw, len: raw.length }) } as any)
+  await send('{"action": "plan", "goal": "live test", "tasks": [{"title":"Unquoted","size":S},{"title":"Second","size":M}]}', 1)
+  const bad: any = await send('{"action": "add", "tasks": [{"title":"A","size":"S"},{"title":"B",}]}', 2)
+  expect(bad.result).toContain('the call was not valid JSON, so none of it was read')
+  expect(bad.result).not.toContain('Plan: 0 of 2')
+})
+
 const MIN = 60000
 const H = 60 * MIN
 const finished = (h: number) => JSON.stringify({ status: 'met', endedAt: NOW - h * H, tasks: [] })
