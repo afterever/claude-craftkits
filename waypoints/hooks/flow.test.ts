@@ -199,6 +199,19 @@ test('a first plan whose tasks cannot be read gets the parse error, and no plan 
   expect(ok.result).toContain('Plan: 0 of 2 tasks done')
 })
 
+test('a call the host wrapped as unparsed input is read, repaired and counted, or answered with why not', async ($, on) => {
+  world(on)
+  await start($)
+  const send = (raw: string, n: number) => $.tool.call({ tool: TOOL, tool_use_id: 'u' + n, __unparsedToolInput: { raw, len: raw.length } } as any)
+  const bad: any = await send('{"action": "plan", "tasks": [{"title":"A","size":"S"},{"title":"B",}]}', 1)
+  expect(bad.result).toContain('the call was not valid JSON, so none of it was read')
+  expect(bad.result).not.toContain('no plan in this chat yet')
+  const ok: any = await send('{"action": "plan", "goal": "live test", "tasks": [{"title":"Unquoted","size":S},{"title":"Second","size":M}]}', 2)
+  expect(ok.result).toContain('Repaired 2 unquoted sizes in the call')
+  expect(ok.result).toContain('Planned 2 tasks.')
+  expect(ok.result).toContain('Plan: 0 of 2 tasks done')
+})
+
 const MIN = 60000
 const H = 60 * MIN
 const finished = (h: number) => JSON.stringify({ status: 'met', endedAt: NOW - h * H, tasks: [] })

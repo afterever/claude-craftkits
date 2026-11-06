@@ -1,7 +1,7 @@
 import { test, expect } from 'claude-code/testing'
 
 // @ts-ignore the plan is plain JavaScript, shared with the module
-import { newGoal, applyAction, progress, eta, instruction, nudge, standing, strictDeny, planSubject, listText, TOOL_SPEC } from './plan.mjs'
+import { newGoal, applyAction, parseTasks, readCall, progress, eta, instruction, nudge, standing, strictDeny, planSubject, listText, TOOL_SPEC } from './plan.mjs'
 
 const TOOL = 'mcp__waypoints__tasks'
 
@@ -197,6 +197,36 @@ test('plain text is still one task a line, and the first-task title still names 
   applyAction(g, { action: 'plan', tasks: '- first step\n- second step' }, { now: 1000 })
   expect(g.tasks.map((t: any) => t.title)).toEqual(['first step', 'second step'])
   expect(planSubject({ tasks: '[{"title":"Named","size":S}]' })).toBe('Named')
+})
+
+// the shape Claude Code hands the tool when the model's whole call is not valid JSON
+const wrapped = (raw: string, extra: object = {}) => ({ tool: TOOL, tool_use_id: 'x', ...extra, __unparsedToolInput: { raw, len: raw.length } })
+
+test('a call the host could not parse is read, repairing a bare size, and keeps the host\'s own fields', async () => {
+  const raw = '{"action": "plan", "goal": "live test", "tasks": [{"title":"Unquoted","size":S},{"title":"Second","size":M}]}'
+  const r = readCall(wrapped(raw, { agentId: 'a1' }))
+  expect(r.error).toBe('')
+  expect(r.repaired).toBe(2)
+  expect(r.input.action).toBe('plan')
+  expect(r.input.goal).toBe('live test')
+  expect(r.input.agentId).toBe('a1')
+  expect(r.input.__unparsedToolInput).toBeUndefined()
+  expect(parseTasks(r.input.tasks).list.map((t: any) => t.size)).toEqual(['S', 'M'])
+})
+
+test('a call that is wrapped and valid JSON is read without a repair, and a plain call is left alone', async () => {
+  const ok = readCall(wrapped('{"action":"done","id":2}'))
+  expect(ok.input.action).toBe('done')
+  expect(ok.repaired).toBe(0)
+  const plain = { tool: TOOL, action: 'show' }
+  expect(readCall(plain)).toEqual({ input: plain, repaired: 0, error: '' })
+})
+
+test('a wrapped call that cannot be read is an error saying so, not "no plan yet"', async () => {
+  const r = readCall(wrapped('{"action": "add", "tasks": [{"title":"A","size":"S"},{"title":"B",}]}'))
+  expect(r.error).toContain('the call was not valid JSON, so none of it was read')
+  expect(r.error).toContain('every value in quotes')
+  expect(readCall(wrapped('[1,2]')).error).toContain('not a JSON object')
 })
 
 test('a plan over 60 tasks keeps the first 60 and says so', async () => {

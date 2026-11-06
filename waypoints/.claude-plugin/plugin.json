@@ -1,7 +1,7 @@
 {
   "name": "waypoints",
   "displayName": "Waypoints",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "description": "A route for /goal and any multi-step work, built from Claude's own task plan: the plan drawn as a line of nodes and legs above the prompt, an ETA at the goal's own pace, a pane that opens by itself with the whole task trail, and every chat's goal in /waypoints. Follows Agent-Pulse's palette and animation. Claude is asked to plan by the mod itself. Fork of Nate Herk's goal-meter 1.0.0.",
   "author": {
     "name": "afterever"

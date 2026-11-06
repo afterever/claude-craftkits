@@ -92,6 +92,10 @@ For `auto`, anything but `off` turns it on. `/goal clear` (or `stop`, `off`, `ca
 
 In the band, the **all tasks** button (or `g`) opens the pane. `g` is a button in the band, so it only works while the band shows; `/waypoints` always does.
 
+## What changed in 2.7.1
+
+- **A whole call that is not valid JSON is read, or answered.** When Claude writes the call itself badly (an unquoted size, a trailing comma), Claude Code does not pass the fields to the tool; it passes the call's text wrapped as `__unparsedToolInput`. Waypoints found no action and no tasks in that and answered "no plan in this chat yet", hiding the cause. Now the text is read as the call: a bare `S`, `M` or `L` is quoted and the reply says it repaired it, and anything else gets a reply saying the call was not valid JSON and that nothing was read. 2.7.0 only covered a `tasks` value that arrives as text inside a valid call.
+
 ## What changed in 2.7.0
 
 - **A bad `tasks` list is answered, not guessed.** If Claude sends the list as text that is not valid JSON (the usual slip is an unquoted size, `"size":S`), Waypoints used to make one task titled with the whole text, and the bar read `0 of 1`. Now a bare `S`, `M` or `L` is quoted and the reply says it repaired it; any other mistake is an error naming the task and the field, and nothing is planned. A size such as `XL` is an error too, where it used to become `M`. A plan or add reply now starts with a count (`Planned 7 tasks.`), so Claude can see what was understood.

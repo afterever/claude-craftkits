@@ -22,7 +22,7 @@
 
 import { minutes, clip, bar, basename } from './fmt.mjs'
 import { makeMasker } from './privacy.mjs'
-import { newGoal, applyAction, progress, eta, parseCheck, isStopWord, parseTasks, planSubject, TOOL_SPEC, instruction, standing, nudge, strictDeny } from './plan.mjs'
+import { newGoal, applyAction, progress, eta, parseCheck, isStopWord, parseTasks, readCall, planSubject, TOOL_SPEC, instruction, standing, nudge, strictDeny } from './plan.mjs'
 import { rolesOf, resolveLook } from './palette.mjs'
 import { drawBand, drawPane, statsLine, label, FULL_MS } from './draw.mjs'
 import { createAutoPane } from './pane.mjs'
@@ -294,8 +294,12 @@ async function finishGoal($, how) {
   expireAfter($)
 }
 
-async function serveTool($, e) {
+async function serveTool($, sent) {
   now = await $.clock.now()
+  // a call the host could not parse as JSON arrives wrapped; read it, or say why not
+  const call = readCall(sent)
+  if (call.error) return { result: `Waypoints: ${call.error}` }
+  const e = call.input
   const action = String(e.action || 'show').toLowerCase()
   const parsed = parseTasks(e.tasks)
   const first = parsed.list[0]
@@ -315,7 +319,8 @@ async function serveTool($, e) {
     $.ui.invalidate('ui.render')
     if (firstPlan && G.planAt) await maybeAutoOpen($)
   }
-  return { result: r.text }
+  const note = call.repaired ? `Repaired ${call.repaired} unquoted ${call.repaired === 1 ? 'size' : 'sizes'} in the call (write "size":"S", with quotes).\n` : ''
+  return { result: note + r.text }
 }
 
 // The goal check's verdict. Its row reaches session.append with no content (the
