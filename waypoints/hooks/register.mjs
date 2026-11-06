@@ -22,7 +22,7 @@
 
 import { minutes, clip, bar, basename } from './fmt.mjs'
 import { makeMasker } from './privacy.mjs'
-import { newGoal, applyAction, progress, eta, parseCheck, isStopWord, normalizeTasks, planSubject, TOOL_SPEC, instruction, standing, nudge, strictDeny } from './plan.mjs'
+import { newGoal, applyAction, progress, eta, parseCheck, isStopWord, parseTasks, planSubject, TOOL_SPEC, instruction, standing, nudge, strictDeny } from './plan.mjs'
 import { rolesOf, resolveLook } from './palette.mjs'
 import { drawBand, drawPane, statsLine, label, FULL_MS } from './draw.mjs'
 import { createAutoPane } from './pane.mjs'
@@ -297,8 +297,11 @@ async function finishGoal($, how) {
 async function serveTool($, e) {
   now = await $.clock.now()
   const action = String(e.action || 'show').toLowerCase()
-  const first = normalizeTasks(e.tasks)[0]
+  const parsed = parseTasks(e.tasks)
+  const first = parsed.list[0]
   if (!G || (G.status !== 'running' && (action === 'plan' || action === 'add'))) {
+    // tasks that could not be read are the answer here, not "no plan yet"
+    if (!first && parsed.error) return { result: `Waypoints: ${parsed.error}` }
     if (!first) return { result: `Waypoints: no plan in this chat yet. Call action "plan" with the tasks first, each { "title": "...", "size": "S" | "M" | "L" }.` }
     // a plan outside /goal: tracked the same way, named after its goal line, else its first task
     G = newGoal({ sessionId, condition: planSubject(e), now, cwd, kind: 'plan' })

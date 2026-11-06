@@ -45,11 +45,6 @@ export function newGoal({ sessionId, condition, now, cwd, kind = 'goal' }) {
   }
 }
 
-function sizeOf(v) {
-  const s = String(v || '').trim().toUpperCase().charAt(0)
-  return SIZES[s] ? s : 'M'
-}
-
 function clean(text, max) {
   const s = String(text ?? '').replace(/\s+/g, ' ').trim()
   return s.length > max ? s.slice(0, max - 1) + '…' : s
@@ -96,29 +91,72 @@ export function eta(goal, now) {
   return { ms, at: now + ms }
 }
 
-// Accepts [{ title, size }], plain strings, or the same as a JSON string
-export function normalizeTasks(raw) {
-  let list = raw
-  if (typeof list === 'string') {
-    try {
-      list = JSON.parse(list)
-    } catch {
-      list = list.split(/\r?\n/)
+const MAX_TASKS = 60
+const SIZE_WORDS = { S: 'S', M: 'M', L: 'L', SMALL: 'S', MEDIUM: 'M', LARGE: 'L' }
+
+// A bare S, M or L after "size": is the one slip callers make (it is not JSON). Quote it.
+const BARE_SIZE = /("size"\s*:\s*)([SMLsml])(?=\s*[,}\]])/g
+
+// Reads the tasks a caller sent. Returns { list, repaired, error }. A caller is a
+// model writing JSON by hand, so bad input is expected and is answered, never guessed:
+// anything wrong gives an error naming it and an empty list, so no half-read plan
+// is ever made. `repaired` counts the unquoted sizes quoted to make the JSON parse.
+export function parseTasks(raw) {
+  const bad = (error) => ({ list: [], repaired: 0, error })
+  if (raw === undefined || raw === null) return { list: [], repaired: 0, error: '' }
+  let items = raw
+  let repaired = 0
+  if (typeof raw === 'string') {
+    const text = raw.trim()
+    if (/^[[{]/.test(text)) {
+      // meant as JSON: it parses (maybe after the repair), or it is an error
+      try {
+        items = JSON.parse(text)
+      } catch (first) {
+        const fixed = text.replace(BARE_SIZE, (_, key, letter) => `${key}"${letter.toUpperCase()}"`)
+        try {
+          items = JSON.parse(fixed)
+          repaired = (text.match(BARE_SIZE) || []).length
+        } catch {
+          return bad(`tasks must be a JSON array of { "title": "...", "size": "S" | "M" | "L" }; it could not be read: ${first.message}`)
+        }
+      }
+    } else {
+      // plain text: one task per line
+      items = text.split(/\r?\n/)
     }
   }
-  if (!Array.isArray(list)) return []
-  const out = []
-  for (const item of list) {
+  if (!Array.isArray(items)) return bad('tasks must be a JSON array of { "title": "...", "size": "S" | "M" | "L" }.')
+
+  const list = []
+  const problems = []
+  items.forEach((item, i) => {
+    const n = i + 1
     if (typeof item === 'string') {
       const title = clean(item.replace(/^\s*[-*\d.)\]]+\s*/, ''), 140)
-      if (title) out.push({ title, size: 'M' })
-      continue
+      if (title) list.push({ title, size: 'M' })
+      return
     }
-    if (!item || typeof item !== 'object') continue
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return problems.push(`task ${n} is not a { title, size } object`)
     const title = clean(item.title ?? item.subject ?? item.name ?? item.task ?? item.description, 140)
-    if (title) out.push({ title, size: sizeOf(item.size) })
+    if (!title) return problems.push(`task ${n} needs a non-empty "title"`)
+    let size = 'M'
+    if (item.size !== undefined && item.size !== null && item.size !== '') {
+      size = SIZE_WORDS[String(item.size).trim().toUpperCase()]
+      if (!size) return problems.push(`task ${n} ("${clean(title, 30)}") has size ${JSON.stringify(item.size)}; use "S", "M" or "L"`)
+    }
+    list.push({ title, size })
+  })
+  if (problems.length) {
+    const shown = problems.slice(0, 3).join('; ')
+    return bad(`${shown}${problems.length > 3 ? `; and ${problems.length - 3} more` : ''}. Nothing was planned.`)
   }
-  return out.slice(0, 60)
+  return { list: list.slice(0, MAX_TASKS), repaired, error: '', cut: Math.max(0, list.length - MAX_TASKS) }
+}
+
+// Just the tasks, for callers that only need the first title
+export function normalizeTasks(raw) {
+  return parseTasks(raw).list
 }
 
 function idsOf(input) {
@@ -157,8 +195,10 @@ export function listText(goal) {
 export function applyAction(goal, input, { now, by = '' } = {}) {
   const action = String(input.action || 'show').toLowerCase()
   const fail = (msg) => ({ ok: false, text: `Waypoints: ${msg}\n${listText(goal)}` })
+  let counted = ''
   if (action === 'plan' || action === 'add') {
-    const list = normalizeTasks(input.tasks)
+    const { list, repaired, error, cut } = parseTasks(input.tasks)
+    if (error) return fail(error)
     if (!list.length) return fail(`"${action}" needs tasks: [{ "title": "...", "size": "S" | "M" | "L" }].`)
     if (action === 'plan' && goal.planAt) {
       // a new plan replaces the work not started yet; finished and running tasks stay
@@ -171,6 +211,7 @@ export function applyAction(goal, input, { now, by = '' } = {}) {
       goal.revisions = [...(goal.revisions || []), { at: now, after: lastDoneId(goal), note }].slice(-20)
     }
     addTasks(goal, list, now, first ? 'plan' : 'later', !!note)
+    counted = taskCount(action, list.length, repaired, cut)
     if (first) {
       goal.planAt = now
       goal.firstPlan = list.length
@@ -207,7 +248,17 @@ export function applyAction(goal, input, { now, by = '' } = {}) {
     return fail(`unknown action "${action}". Use plan, add, start, done, drop, park, or show.`)
   }
   goal.updatedAt = now
-  return { ok: true, text: listText(goal) }
+  return { ok: true, text: counted ? `${counted}\n${listText(goal)}` : listText(goal) }
+}
+
+// The first line of a plan or add reply: how many tasks were understood, so a caller
+// can compare it with what it sent, and a note when its JSON had to be repaired
+function taskCount(action, n, repaired, cut) {
+  const noun = n === 1 ? 'task' : 'tasks'
+  let line = `${action === 'plan' ? 'Planned' : 'Added'} ${n} ${noun}.`
+  if (repaired) line += ` Repaired ${repaired} unquoted ${repaired === 1 ? 'size' : 'sizes'} (write "size":"S", with quotes).`
+  if (cut) line += ` Kept the first ${MAX_TASKS}; ${cut} more were left out.`
+  return line
 }
 
 // The goal check's verdict, from the text the engine records for it. The shape

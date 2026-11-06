@@ -187,6 +187,18 @@ test('a plan made without /goal is tracked the same way', async ($, on) => {
   expect(d.result).toContain('Plan: 1 of 2 tasks done, 33% of the work.')
 })
 
+test('a first plan whose tasks cannot be read gets the parse error, and no plan is started', async ($, on) => {
+  world(on)
+  await start($)
+  const bad: any = await $.tool.call({ tool: TOOL, action: 'plan', tasks: '[{"title":"A","size":"S"},{"title":"B",}]', tool_use_id: 't1' })
+  expect(bad.result).toContain('tasks must be a JSON array')
+  expect(bad.result).not.toContain('no plan in this chat yet')
+  // the repaired form starts a plan, and the reply carries the count
+  const ok: any = await $.tool.call({ tool: TOOL, action: 'plan', tasks: '[{"title":"A","size":S},{"title":"B","size":M}]', tool_use_id: 't2' })
+  expect(ok.result).toContain('Planned 2 tasks. Repaired 2 unquoted sizes')
+  expect(ok.result).toContain('Plan: 0 of 2 tasks done')
+})
+
 const MIN = 60000
 const H = 60 * MIN
 const finished = (h: number) => JSON.stringify({ status: 'met', endedAt: NOW - h * H, tasks: [] })

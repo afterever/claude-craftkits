@@ -712,3 +712,35 @@ open and cleared to `working` on a reply. Through the branch's own hook (`--plug
 Version **2.6.0**; tests in `herdr.test.ts` (the gates, the probe, the message, the script's quoting, and through the
 hooks: off by default, both shells, no shell, a locked-down one, outside Herdr, macOS, the desktop app, background work,
 a new turn first, a finished plan, Esc).
+
+## 2.7.0: tasks that are not valid are answered, not guessed
+
+**The bug.** A model writes the `tasks` argument by hand, and now and then it writes the size bare (`"size":S`), which is
+not JSON. `normalizeTasks` fell back to treating a string that failed `JSON.parse` as plain text, one task a line, so a
+one-line list became one task titled with the whole text. The reply said `0 of 1 tasks` with no sign that anything was
+misread, and the bar and ETA, which come only from the list, were confidently wrong. Callers never see the bar, so only
+the reply text can tell them.
+
+**The rule.** `parseTasks(raw)` in `plan.mjs` returns `{ list, repaired, error, cut }`, and bad input is an error, never a
+guess:
+
+- **A string that starts with `[` or `{` is meant as JSON.** It parses, or it parses after the one repair below, or it is an
+  error naming the parser's own message. It is never read as plain text. Text that starts with anything else is still one
+  task a line.
+- **One repair, always reported.** A bare `S`, `M` or `L` straight after `"size":` is quoted, and the reply says
+  `Repaired n unquoted sizes`. It is applied only after `JSON.parse` has failed, so valid input is never touched. A silent
+  repair would hide the slip from the caller, so the reply names it; any other slip is an error.
+- **Each task is checked.** A `title` (or `subject`, `name`, `task`, `description`) must be non-empty; `size` is `S`, `M`
+  or `L` (case-free, or `small`, `medium`, `large`) and `M` when missing. Anything else is listed by task number and field
+  (three at most, then `and n more`). If any task fails, nothing is planned. A size such as `XL` used to be read as `X`
+  and silently become `M`.
+- **The reply starts with a count**, `Planned 7 tasks.` or `Added 2 tasks.`, so a caller can compare it with what it sent.
+  Over 60 tasks the first 60 are kept and the line says how many were left out (it used to cut without a word).
+- **The first plan has no goal yet?** `serveTool` shows the parse error, not "no plan in this chat yet", which would have
+  hidden the cause.
+
+**Not done on purpose.** No new input form (one string per task, `"S: title"`): plain text per line already exists, and a
+second text grammar is more for the caller to get wrong. `normalizeTasks` stays for `planSubject`, as `parseTasks(raw).list`.
+
+Version **2.7.0**; tests in `plan.test.ts` (the repair and its report, unreadable JSON, per-task errors, defaults and
+words, the count line, plain text, the 60 cut).
