@@ -16,6 +16,13 @@
   new code afterwards in a fresh Claude session, so there is no need to hold the merge for a live
   check; a problem found there becomes the next version.
 
+## Releases
+
+- **Tag a release `<mod>-v<version>`** (for example `waypoints-v2.7.3`).
+- **Title it `<mod> <version>` and nothing else** (`waypoints 2.7.3`), never with a summary after
+  it. The summary of the change goes in the release body, which then points to the README's
+  "What changed in <version>" section.
+
 ## Version rows
 
 - **Every mod with a pane ends it with a dim row, `<mod> v<version>`**, read from `VERSION` in
