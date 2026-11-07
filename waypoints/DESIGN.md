@@ -671,8 +671,8 @@ as a `FileStream`, so both shells open it with `CreateFileW` and `WriteFile`.
 
 **Every assumption is checked**, in three places:
 - `hostBlocker` at session start: Windows; a terminal session (`isInteractive` and `surface === 'terminal'`; the desktop
-  app is an SDK host, neither); a Herdr terminal (`HC_TERMINAL_ID` set). These only log: the setting is one for the machine,
-  shared with sessions it cannot apply to.
+  app is an SDK host, neither); a Herdr terminal (`HC_TERMINAL_ID` set). These say nothing (2.7.4; 2.6.0 logged each): the
+  setting is one for the machine, shared with sessions it cannot apply to. A working probe says nothing either (2.7.3).
 - The probe at session start, beside `session.start` rather than in it: `powershell.exe`, else `pwsh.exe`, must answer in
   `FullLanguage` mode (`Add-Type` is refused in ConstrainedLanguage) and find `hc`. A Herdr terminal that fails it gets one
   toast naming why.

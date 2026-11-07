@@ -92,6 +92,10 @@ For `auto`, anything but `off` turns it on. `/goal clear` (or `stop`, `off`, `ca
 
 In the band, the **all tasks** button (or `g`) opens the pane. `g` is a button in the band, so it only works while the band shows; `/waypoints` always does.
 
+## What changed in 2.7.4
+
+- **Herdr status no longer logs that it was left out.** Where the setting cannot apply (not on Windows, the desktop app, a terminal outside Herdr) or no PowerShell can do it, a `waypoints: Herdr status left out (...)` line was logged at session start. Both are gone. A Herdr terminal where it cannot work still gets its toast, and a failed mark is still logged.
+
 ## What changed in 2.7.3
 
 - **Herdr status starts quietly.** With Herdr status on, every session opened with a `waypoints: Herdr status on (powershell.exe, PowerShell 5)` line. It said nothing the person needed, so it is gone: Herdr status still works the same, and a Herdr terminal where it cannot work still gets its toast and log line.
