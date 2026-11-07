@@ -411,18 +411,14 @@ async function judge($) {
 }
 
 // Herdr status (herdr.mjs): at session start, check every prerequisite once. The host's
-// own (Windows, a terminal session, a Herdr terminal) only go to the log: the setting is
+// own (Windows, a terminal session, a Herdr terminal) pass in silence: the setting is
 // shared with sessions it cannot apply to. A Herdr terminal whose PowerShell cannot do it
-// gets one toast, since the person asked for this there.
+// gets one toast, since the person asked for this there. Nothing is logged at start.
 async function checkHerdr($, e) {
   herdr = { ready: false, exe: '' }
   const terminalId = await $.env.get('HC_TERMINAL_ID')
   const host = hostBlocker({ option: options.herdr, win, interactive, surface: e.surface, terminalId })
-  if (host === 'off') return
-  if (host) {
-    $.ui.log(`waypoints: Herdr status left out (${host})`)
-    return
-  }
+  if (host) return
   let why = ''
   for (const exe of SHELLS) {
     let p = null
@@ -434,14 +430,12 @@ async function checkHerdr($, e) {
     }
     const blocker = probeBlocker(p)
     if (!blocker) {
-      // working is the normal case, so it says nothing (the host can show log lines at startup)
       herdr = { ready: true, exe }
       return
     }
     if (p && !why) why = blocker
   }
   why = why || 'neither powershell.exe nor pwsh.exe runs'
-  $.ui.log(`waypoints: Herdr status left out (${why})`)
   $.ui.toast(`Waypoints: Herdr status is on, but ${why}`)
 }
 
