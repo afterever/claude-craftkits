@@ -92,6 +92,10 @@ For `auto`, anything but `off` turns it on. `/goal clear` (or `stop`, `off`, `ca
 
 In the band, the **all tasks** button (or `g`) opens the pane. `g` is a button in the band, so it only works while the band shows; `/waypoints` always does.
 
+## What changed in 2.7.3
+
+- **Herdr status starts quietly.** With Herdr status on, every session opened with a `waypoints: Herdr status on (powershell.exe, PowerShell 5)` line. It said nothing the person needed, so it is gone: Herdr status still works the same, and a Herdr terminal where it cannot work still gets its toast and log line.
+
 ## What changed in 2.7.2
 
 - **A call wrapped twice is unwrapped.** In 2.7.1's live test, a call with a trailing comma reached the tool as a string holding `{"raw": "...", "len": n}`. Waypoints took that for the call itself, found no action in it, and listed the plan as if all were well, with no error. It now keeps unwrapping until it reaches the call, then reads it or says it was not valid JSON.

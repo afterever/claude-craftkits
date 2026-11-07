@@ -434,8 +434,8 @@ async function checkHerdr($, e) {
     }
     const blocker = probeBlocker(p)
     if (!blocker) {
+      // working is the normal case, so it says nothing (the host can show log lines at startup)
       herdr = { ready: true, exe }
-      $.ui.log(`waypoints: Herdr status on (${exe}, PowerShell ${p.ps})`)
       return
     }
     if (p && !why) why = blocker
