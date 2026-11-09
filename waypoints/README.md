@@ -92,6 +92,10 @@ For `auto`, anything but `off` turns it on. `/goal clear` (or `stop`, `off`, `ca
 
 In the band, the **all tasks** button (or `g`) opens the pane. `g` is a button in the band, so it only works while the band shows; `/waypoints` always does.
 
+## What changed in 2.7.5
+
+- **Waypoints no longer prints notes in the chat.** In the Claude desktop app's Code tab, a message headed `waypoints` ("the system prompt got no standing ask...") appeared under your first prompt, twice. It was a diagnostic meant for `claude --debug`, and the mod wrote it where chat rows go. Every such note now goes to the debug log only. Nothing about when Claude is asked to plan has changed.
+
 ## What changed in 2.7.4
 
 - **Herdr status no longer logs that it was left out.** Where the setting cannot apply (not on Windows, the desktop app, a terminal outside Herdr) or no PowerShell can do it, a `waypoints: Herdr status left out (...)` line was logged at session start. Both are gone. A Herdr terminal where it cannot work still gets its toast, and a failed mark is still logged.

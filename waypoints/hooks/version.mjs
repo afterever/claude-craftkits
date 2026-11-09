@@ -2,4 +2,4 @@
 // "node:fs", not as a JSON import), so the pane's last row carries a copy.
 // Bump it with plugin.json on every release; CI fails a pull request where the
 // two differ (.github/scripts/check-versions.mjs).
-export const VERSION = '2.7.4'
+export const VERSION = '2.7.5'
