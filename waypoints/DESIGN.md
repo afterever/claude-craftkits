@@ -798,3 +798,25 @@ count adds up. More than four levels, or a non-object, is the same "not valid JS
 no `action` can only be a wrapper.
 
 Version **2.7.2**; tests in `plan.test.ts` and `flow.test.ts`, built from the shapes above. Both fail on 2.7.1's `plan.mjs`.
+
+## 2.7.5: the mod's diagnostics stay out of the transcript
+
+**The problem.** Opening a chat in the Claude desktop app's Code tab and typing "Hi" drew two dim rows, each headed `waypoints`:
+*the system prompt got no standing ask (a print session that draws nowhere)*. They were the `ui.log` lines 2.5.1 and 2.5.2 added
+so a missing ask could be traced.
+
+**Root cause.** `$.ui.log(text)` with no options writes to the `transcript` sink, a visible row. Only `{ to: "debug" }` keeps a
+line in the debug log alone. Every `waypoints:` diagnostic was written for `claude --debug` (this file and the 2.0.1 test run
+say so) but none passed the option. The Desktop app made it loud because it composes the system prompt more than once per
+turn (the extra composes carry the `print` trait and no surface), so the line printed twice. The standing ask itself did arrive
+in the main compose; the gate was right and only the logging was wrong.
+
+**The fix.** One helper in `register.mjs`, `debug($, text)`, is the only way the mod logs, and every diagnostic uses it. The
+gating, the wording of the lines and what Claude is told are unchanged. (2.7.3 and 2.7.4 had already removed the three Herdr
+start-up lines; the helper covers the six that remain.)
+
+**Why every line, not just these two.** The pane failing to open, the task tool not registering and a Herdr mark that failed are
+the same kind of note, for someone running `claude --debug`. A terminal session showed them as rows too.
+
+Version **2.7.5**; test in `flow.test.ts` (a prompt left without the ask logs it, and no line the mod writes goes anywhere but
+`debug`). It fails on 2.7.4's `register.mjs`.

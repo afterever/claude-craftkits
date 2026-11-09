@@ -22,13 +22,17 @@ function world(on: On, o: Opts = {}) {
   mock.store(on, o.stored ?? {})
   mock.env(on, { USERPROFILE: o.home ?? 'C:/Users/bats', OS: o.os ?? 'Windows_NT' })
   const toasts: string[] = []
+  const logs: { text: string; to: string }[] = []
   const commands: string[] = []
   const runs: (readonly string[])[] = []
   const files = new Map((o.files ?? []).map((f) => [f.name, f]))
   const nameOf = (path: string) => String(path).split(/[\\/]/).pop()!
   on('session.start', async () => ({ cwd: 'C:/bats' }))
   on('session.surface', async () => ({ value: 'terminal' }) as any)
-  on('ui.log', async () => ({ value: undefined }) as any)
+  on('ui.log', async (_$, e) => {
+    logs.push({ text: e.text, to: e.to })
+    return { value: undefined } as any
+  })
   on('session.id', async () => ({ value: 'sess-1' }) as any)
   on('session.cwd', async () => ({ value: 'C:/bats' }) as any)
   on('fs.exists', async (_$, e) => ({ value: files.has(nameOf(e.path)) }) as any)
@@ -63,7 +67,7 @@ function world(on: On, o: Opts = {}) {
   on('command.run', { command: 'goal' }, async () => ({}) as any)
   // every other tool answers ok, as the engine's tool would
   on('tool.call', async () => ({ result: 'ok', text: 'ok' }) as any)
-  return { toasts, commands, runs }
+  return { toasts, commands, runs, logs }
 }
 
 const start = ($: any) => $.session.start({ cwd: 'C:/bats', surface: 'terminal', isInteractive: true })
@@ -111,6 +115,17 @@ test('the Desktop app is an SDK host (the print trait) that draws, so it gets th
   expect(ids(await compose($, ['print'], ['desktop']))).toEqual(['intro', 'waypoints:plan'])
   // a teammate there still must not replace the lead's plan
   expect(ids(await compose($, ['print', 'teammate'], ['desktop']))).toEqual(['intro'])
+})
+
+// $.ui.log defaults to the transcript, a visible row: the Desktop app composes the prompt
+// more than once per turn and showed this line twice under "Hi". It is for `claude --debug`.
+test('a prompt left without the ask is noted in the debug log, never in the transcript', async ($, on) => {
+  const w = world(on, { noTool: true })
+  await start($)
+  await compose($, ['print'], [])
+  expect(w.logs.some((l) => l.text.includes('no standing ask'))).toBe(true)
+  // every line the mod writes (here also the task tool refusing to register) stays off screen
+  expect(w.logs.filter((l) => l.to !== 'debug')).toEqual([])
 })
 
 test('/waypoints auto off removes the ask and auto on brings it back, kept between sessions', async ($, on) => {

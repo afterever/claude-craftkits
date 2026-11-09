@@ -38,6 +38,10 @@ const REOPEN_MS = 5 * 60000 // a goal closed on its tasks reopens if Claude carr
 const NUDGE_AFTER = 4 // tool calls into a goal with no plan before the reminder
 const WRITERS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit'])
 
+// A note for `claude --debug`. $.ui.log alone draws a row in the transcript, and the Desktop
+// app composes the prompt more than once per turn, so a bare call showed up under every "Hi".
+const debug = ($, text) => $.ui.log(text, { to: 'debug' })
+
 let G = null
 let sessionId = ''
 let home = ''
@@ -215,7 +219,7 @@ async function maybeAutoOpen($) {
     autoPane.opened()
   } catch (err) {
     // nobody asked, so no toast; the log keeps the reason
-    $.ui.log(`waypoints: the pane did not open (${err && err.message ? err.message : err})`)
+    debug($, `waypoints: the pane did not open (${err && err.message ? err.message : err})`)
   }
 }
 
@@ -448,9 +452,9 @@ function markHerdr($) {
     try {
       const r = await $.process.run(markArgv(herdr.exe, markMessage(G, mask)), { timeoutMs: 30000 })
       const out = String(r.stdout || '').trim()
-      if (out !== 'ok' && !out.startsWith('ok ')) $.ui.log(`waypoints: Herdr status not marked (${clip(out || `exit ${r.exitCode}`, 120)})`)
+      if (out !== 'ok' && !out.startsWith('ok ')) debug($, `waypoints: Herdr status not marked (${clip(out || `exit ${r.exitCode}`, 120)})`)
     } catch (err) {
-      $.ui.log(`waypoints: Herdr status not marked (${clip(String(err && err.message ? err.message : err), 120)})`)
+      debug($, `waypoints: Herdr status not marked (${clip(String(err && err.message ? err.message : err), 120)})`)
     }
   })
 }
@@ -482,7 +486,7 @@ export function register(on, opts) {
       if (reg && reg.tool) toolName = reg.tool
     } catch (err) {
       toolFailed = true
-      $.ui.log(`waypoints: the task tool did not register (${err && err.message ? err.message : err})`)
+      debug($, `waypoints: the task tool did not register (${err && err.message ? err.message : err})`)
     }
     commandName = (await registerCommand($)) || commandName
     await restore($)
@@ -518,7 +522,7 @@ export function register(on, opts) {
       const r = await next(e)
       const traits = e.traits || []
       const unwatched = traits.includes('print') && !(e.surfaces && e.surfaces.length)
-      if (unwatched) $.ui.log('waypoints: the system prompt got no standing ask (a print session that draws nowhere)')
+      if (unwatched) debug($, 'waypoints: the system prompt got no standing ask (a print session that draws nowhere)')
       if (!settings.auto || toolFailed || unwatched || traits.some((t) => t === 'bare' || t === 'teammate')) return r
       return { sections: [...r.sections, { id: 'waypoints:plan', text: standing(toolName), scope: 'session' }] }
     })
@@ -554,7 +558,7 @@ export function register(on, opts) {
       // attaches after session.start; only a -p run draws nowhere. Only managed mode
       // (a Team or Enterprise plan) reads this: elsewhere the system prompt carries the ask
       const watched = interactive || ((await $.session.surfaces().catch(() => [])) || []).length > 0
-      if (!watched) $.ui.log(`waypoints: managed mode left out the standing ask (isInteractive ${interactive}, nothing draws)`)
+      if (!watched) debug($, `waypoints: managed mode left out the standing ask (isInteractive ${interactive}, nothing draws)`)
       else {
         asked = true
         return next({ ...e, context: [...(e.context || []), standing(toolName)] })
