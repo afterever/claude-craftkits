@@ -820,3 +820,34 @@ the same kind of note, for someone running `claude --debug`. A terminal session 
 
 Version **2.7.5**; test in `flow.test.ts` (a prompt left without the ask logs it, and no line the mod writes goes anywhere but
 `debug`). It fails on 2.7.4's `register.mjs`.
+
+## 2.8.0: the task result opens by itself in the terminal
+
+**The problem.** A `waypoints:tasks` call's result block (`Plan: 13 of 15 tasks done` and one line per task) is drawn by Claude
+Code's stock `ToolResult` renderer, which clips it to a few lines and `... +13 lines`. The person wanted the list open on every
+call, with `/skin` untouched.
+
+**Who draws what.** `/skin` draws the `•` row and its `>` chevron (a `ToolUse` hook) and only rewrites `ToolResult` for shell and
+edit tools; for any other tool it calls `next`, so the stock clip stays. Its expand control sets `isExpanded` on `ToolGroup`,
+the "Read 3 files" line, never on this block. `ToolResult.isExpanded` is read-only in the API, so asking the stock renderer to
+open is not an option.
+
+**The fix.** A `ui.render` hook on `ToolResult` in `register.mjs` that answers for itself: one `Text` per line of the result,
+masked like the band. It lives wholly in Waypoints and needs nothing from `/skin`.
+
+**When it steps aside (`next(e)`).** Another tool; any surface but the terminal (Desktop, VS Code and mobile draw results as
+cards of their own, and the clip is a terminal thing); an errored call; `isExpanded` (ctrl+o); and an `output` with no readable
+text. `resultText` in `plan.mjs` reads a string, `{ result }`, `{ text }` and MCP content blocks, since the shape the engine
+stores for a plugin tool was not verified; the tool itself answers `{ result }`. A shape it cannot read logs a debug line and
+leaves the stock result.
+
+**Every action expands.** `ToolResult` carries no input, so the hook cannot tell `start` from `done` from `plan`. The ask was
+for `start` and `done`; the others are a superset. Telling them apart would take a per-`tool_use_id` record kept at `tool.call`,
+lost on a reload, or parsing the result text. Not worth it; there is no toggle either, since no one asked for one.
+
+**Known wart: `/skin`.** No API orders two mods' hooks. If `/skin` runs first and its chevron is open, it returns its own view
+and never calls `next`, so this hook does not run. If this hook runs first it never calls `next` either, so `/skin` does not get
+to blank the stock result for its open chevron, and the list shows beside its view. Neither changes `/skin`'s closed state,
+which is the default.
+
+Version **2.8.0**; tests in `result.test.ts`: the full list, each readable output shape, and each case that falls through.

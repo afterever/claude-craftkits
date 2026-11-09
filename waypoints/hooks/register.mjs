@@ -22,7 +22,7 @@
 
 import { minutes, clip, bar, basename } from './fmt.mjs'
 import { makeMasker } from './privacy.mjs'
-import { newGoal, applyAction, progress, eta, parseCheck, isStopWord, parseTasks, readCall, planSubject, TOOL_SPEC, instruction, standing, nudge, strictDeny } from './plan.mjs'
+import { newGoal, applyAction, progress, eta, parseCheck, isStopWord, parseTasks, readCall, planSubject, resultText, TOOL_SPEC, instruction, standing, nudge, strictDeny } from './plan.mjs'
 import { rolesOf, resolveLook } from './palette.mjs'
 import { drawBand, drawPane, statsLine, label, FULL_MS } from './draw.mjs'
 import { createAutoPane } from './pane.mjs'
@@ -779,6 +779,24 @@ export function register(on, opts) {
     }
     const modes = Array.isArray(e.props && e.props.modes) ? e.props.modes : []
     return next({ ...e, props: { ...e.props, modes: [...modes, label] } })
+  })
+
+  // The task tool's result in the terminal's transcript: the stock renderer clips a long plan
+  // to a few lines and "... +N lines", so draw all of it. Every action of the tool expands
+  // (a result does not say which call it answers). The terminal only: Desktop, VS Code and
+  // mobile draw results as cards of their own. What this hook cannot read, an error, and
+  // ctrl+o's full view all stay with the stock renderer.
+  on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
+    const p = e.props
+    if (e.surface !== 'terminal' || !p || p.tool !== toolName || p.isErrored || p.isExpanded) return next(e)
+    const text = resultText(p.output)
+    if (text === null) {
+      debug($, `waypoints: the task result was not drawn in full (output was ${typeof p.output})`)
+      return next(e)
+    }
+    const { Box, Text } = $.ui.resolve(e)
+    const lines = text.trimEnd().split(/\r?\n/)
+    return Box({ flexDirection: 'column', children: lines.map((l, i) => Text({ key: 'wp-result-' + i, children: [mask(l)] })) })
   })
 
   on('ui.render', { component: 'Pane' }, async ($, e, next) => {
