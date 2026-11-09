@@ -322,6 +322,23 @@ export function parseCheck(text) {
   return { met, notMet, reason }
 }
 
+// The text of the task tool's stored result, for the transcript. The tool answers
+// { result: string }; the engine may store that record, a bare string, or MCP content
+// blocks, so read all three. Anything else is null and the stock renderer draws it.
+export function resultText(output) {
+  if (typeof output === 'string') return output
+  if (Array.isArray(output)) {
+    const parts = output.filter((b) => b && b.type === 'text' && typeof b.text === 'string').map((b) => b.text)
+    return parts.length ? parts.join('\n') : null
+  }
+  if (output && typeof output === 'object') {
+    for (const key of ['result', 'text', 'content']) {
+      if (output[key] !== undefined) return resultText(output[key])
+    }
+  }
+  return null
+}
+
 export const TOOL_SPEC = {
   name: 'tasks',
   description:

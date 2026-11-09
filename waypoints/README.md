@@ -92,6 +92,10 @@ For `auto`, anything but `off` turns it on. `/goal clear` (or `stop`, `off`, `ca
 
 In the band, the **all tasks** button (or `g`) opens the pane. `g` is a button in the band, so it only works while the band shows; `/waypoints` always does.
 
+## What changed in 2.8.0
+
+- **The task list under a Waypoints call opens by itself in the terminal.** Claude's `waypoints:tasks` calls (`start`, `done`, `plan` and the rest) showed the plan clipped to a few lines and `... +13 lines`. The terminal now draws the whole list under the call. Other tools, the Desktop app, VS Code, mobile, an error and the ctrl+o view keep their usual result. It works without `/skin` and changes nothing in it. While a recording masks the screen, the list is masked like the rest of the mod.
+
 ## What changed in 2.7.5
 
 - **Waypoints no longer prints notes in the chat.** In the Claude desktop app's Code tab, a message headed `waypoints` ("the system prompt got no standing ask...") appeared under your first prompt, twice. It was a diagnostic meant for `claude --debug`, and the mod wrote it where chat rows go. Every such note now goes to the debug log only. Nothing about when Claude is asked to plan has changed.
