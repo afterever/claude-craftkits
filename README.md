@@ -1,6 +1,6 @@
-# claude-mods
+# claude-craftkits
 
-Personal [Claude Code mods](https://code.claude.com/docs): plugins of function hooks that draw panes, bands and footers inside Claude Code. This repo is also a plugin marketplace, so every computer installs the same mods the same way.
+Craft kits: a personal toolkit of [Claude Code mods](https://code.claude.com/docs), crafted for my own workflow. They are plugins of function hooks that draw panes, bands and footers inside Claude Code. This repo is also a plugin marketplace, so every computer installs the same mods the same way.
 
 | Mod | What it does |
 | --- | --- |
@@ -15,7 +15,7 @@ Personal [Claude Code mods](https://code.claude.com/docs): plugins of function h
 ## Install (each computer)
 
 ```
-claude plugin marketplace add afterever/claude-mods
+claude plugin marketplace add afterever/claude-craftkits
 claude plugin install ctx@afterever-mods
 claude plugin install subagent-progress@afterever-mods
 claude plugin install prompt-upgrade@afterever-mods

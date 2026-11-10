@@ -125,7 +125,7 @@ For a mod loaded by hand, set them in `~/.claude/settings.json`:
 ## Install
 
 ```
-/plugin install subagent-progress --marketplace afterever/claude-mods
+/plugin install subagent-progress --marketplace afterever/claude-craftkits
 ```
 
 Install instructions for the whole repository are in the [repository README](../README.md).

@@ -8,7 +8,7 @@ file.
 
 Paste this into Claude Code on the new computer:
 
-> Read `SETUP.md` in the `afterever/claude-mods` repository and set up my Claude Code mods exactly
+> Read `SETUP.md` in the `afterever/claude-craftkits` repository and set up my Claude Code mods exactly
 > as it says: add the marketplaces and install the plugins, run `/skin words claude`, and
 > rebuild the `cupertino` skin. Show me the diff before changing any file, and run the
 > checks at the end.
@@ -17,20 +17,20 @@ Paste this into Claude Code on the new computer:
 
 | Mod | Source | Tested | What it is |
 | --- | --- | --- | --- |
-| `ctx` | `afterever/claude-mods` (this repo) | 0.8.6 | Context window pane and band, compacting on your terms, the plan's pace, its look |
-| `subagent-progress` | `afterever/claude-mods` (this repo) | 2.2.1 | Progress bar and live panel for subagent work |
-| `prompt-upgrade` | `afterever/claude-mods` (this repo) | 0.2.1 | `/prompt-upgrade` turns a rough prompt into a great one before it is sent |
-| `work-report` | `afterever/claude-mods` (this repo) | 0.4.1 | `/work-report` shows what Claude has done for you: tasks, hours saved, what that is worth |
-| `waypoints` | `afterever/claude-mods` (this repo) | 2.4.0 | Task plan shown as a route above the prompt for a `/goal` or any multi-step work, with a pane that opens by itself; replaces `goal-meter` |
+| `ctx` | `afterever/claude-craftkits` (this repo) | 0.8.6 | Context window pane and band, compacting on your terms, the plan's pace, its look |
+| `subagent-progress` | `afterever/claude-craftkits` (this repo) | 2.2.1 | Progress bar and live panel for subagent work |
+| `prompt-upgrade` | `afterever/claude-craftkits` (this repo) | 0.2.1 | `/prompt-upgrade` turns a rough prompt into a great one before it is sent |
+| `work-report` | `afterever/claude-craftkits` (this repo) | 0.4.1 | `/work-report` shows what Claude has done for you: tasks, hours saved, what that is worth |
+| `waypoints` | `afterever/claude-craftkits` (this repo) | 2.4.0 | Task plan shown as a route above the prompt for a `/goal` or any multi-step work, with a pane that opens by itself; replaces `goal-meter` |
 | `skins` | `hellosverre/claude-skins` | 0.5.13 | Colour scheme and words for the transcript |
 | `superpowers` | `obra/superpowers` | 7.0.0 | Skills library: brainstorming, planning, test-driven development, debugging and review workflows |
-| `agent-pulse` | `afterever/claude-mods` (this repo) | 1.1.0 | Box above the prompt naming the step Claude is on, in color and motion, with a step history |
-| `arsenal` | `afterever/claude-mods` (this repo) | 0.4.6 | Button in the footer under the prompt that opens a docked menu: Prompt Upgrade switch, Sound notifications switch with a sound for your Enter and one for Claude, shortcuts to `/prompt-upgrade` and `/work-report`, and your own skills and commands (USER and PROJECT), each of which you can turn off |
+| `agent-pulse` | `afterever/claude-craftkits` (this repo) | 1.1.0 | Box above the prompt naming the step Claude is on, in color and motion, with a step history |
+| `arsenal` | `afterever/claude-craftkits` (this repo) | 0.4.6 | Button in the footer under the prompt that opens a docked menu: Prompt Upgrade switch, Sound notifications switch with a sound for your Enter and one for Claude, shortcuts to `/prompt-upgrade` and `/work-report`, and your own skills and commands (USER and PROJECT), each of which you can turn off |
 
 ## Install
 
 ```
-claude plugin marketplace add afterever/claude-mods
+claude plugin marketplace add afterever/claude-craftkits
 claude plugin marketplace add hellosverre/claude-skins
 claude plugin marketplace add obra/superpowers
 

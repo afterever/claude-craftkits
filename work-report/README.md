@@ -123,14 +123,14 @@ None. The mod makes no model calls: it listens to events and counts. Recording a
 From a terminal session:
 
 ```
-claude plugin marketplace add afterever/claude-mods
+claude plugin marketplace add afterever/claude-craftkits
 claude plugin install work-report@afterever-mods
 ```
 
 Restart Claude Code to apply. To try it from a checkout without installing:
 
 ```
-claude --plugin-dir <path to claude-mods>\work-report
+claude --plugin-dir <path to claude-craftkits>\work-report
 ```
 
 ## How it is built
@@ -164,8 +164,8 @@ types/index.d.ts              the mod's $.state contract
 ## Develop
 
 ```
-claude plugin validate <path to claude-mods>
-claude plugin test <path to claude-mods>\work-report
+claude plugin validate <path to claude-craftkits>
+claude plugin test <path to claude-craftkits>\work-report
 ```
 
 The tests make no model calls and cost nothing. They cover sorting a task by its tools, counting only typed prompts, the streak, adding days together, the day of the year and stepping across clock changes, each tab drawing its own title, dates and chart, the empty state, three then two then one tiles, that on the desktop the tiles, bars and chart are drawings whose rows share one start, one length and one right edge at every width, and that no row of the pane is wider than the pane at narrow and wide widths on both the terminal and the desktop.
@@ -174,4 +174,4 @@ Bump `version` in `plugin.json` when you change the mod, or installed copies wil
 
 ## Credits
 
-Built as a Claude Code mod for [afterever/claude-mods](https://github.com/afterever/claude-mods).
+Built as a Claude Code mod for [afterever/claude-craftkits](https://github.com/afterever/claude-craftkits).

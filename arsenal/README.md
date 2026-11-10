@@ -130,7 +130,7 @@ These rows have no hotkeys. LAUNCH keeps its own.
 ## Install
 
 ```
-claude plugin marketplace add afterever/claude-mods
+claude plugin marketplace add afterever/claude-craftkits
 claude plugin install arsenal@afterever-mods
 ```
 

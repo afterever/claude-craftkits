@@ -1,4 +1,4 @@
-# claude-mods
+# claude-craftkits
 
 ## Git workflow
 

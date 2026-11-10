@@ -69,14 +69,14 @@ claude plugin uninstall whats-agent-doing@tzafrir
 Then, in Claude Code:
 
 ```
-/plugin marketplace add afterever/claude-mods
+/plugin marketplace add afterever/claude-craftkits
 /plugin install agent-pulse@afterever-mods
 ```
 
 Or from your shell:
 
 ```
-claude plugin marketplace add afterever/claude-mods
+claude plugin marketplace add afterever/claude-craftkits
 claude plugin install agent-pulse@afterever-mods
 ```
 

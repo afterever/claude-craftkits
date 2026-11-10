@@ -61,14 +61,14 @@ Each upgrade makes up to two model calls on your account: one short `haiku` call
 From a terminal session:
 
 ```
-claude plugin marketplace add afterever/claude-mods
+claude plugin marketplace add afterever/claude-craftkits
 claude plugin install prompt-upgrade@afterever-mods
 ```
 
 Restart Claude Code to apply. To try it from a checkout without installing:
 
 ```
-claude --plugin-dir <path to claude-mods>\prompt-upgrade
+claude --plugin-dir <path to claude-craftkits>\prompt-upgrade
 ```
 
 ## How it is built
@@ -96,8 +96,8 @@ types/index.d.ts              the mod's $.state contract
 ## Develop
 
 ```
-claude plugin validate <path to claude-mods>
-claude plugin test <path to claude-mods>\prompt-upgrade
+claude plugin validate <path to claude-craftkits>
+claude plugin test <path to claude-craftkits>\prompt-upgrade
 ```
 
 The tests stub the model, so running them costs nothing. They cover which prompts are held and which pass through, reading the questions and the rewrite, the whole flow from `/prompt-upgrade` to Run, Cancel putting the prompt back, the on and off switch, a failed call, a reload mid-step, the history, and that no row of the pane is wider than the pane at narrow and wide widths on both the terminal and the desktop.
@@ -107,4 +107,4 @@ Bump `version` in `plugin.json` when you change the mod, or installed copies wil
 ## Credits
 
 - The idea and the spec: the author of [AI Made Easy](https://tristenobrien.ai/), https://tristenobrien.ai/.
-- Built as a Claude Code mod for [afterever/claude-mods](https://github.com/afterever/claude-mods).
+- Built as a Claude Code mod for [afterever/claude-craftkits](https://github.com/afterever/claude-craftkits).

@@ -23,7 +23,7 @@ Why each feature exists and how it is built: [DESIGN.md](./DESIGN.md).
 ## Install
 
 ```
-claude plugin marketplace add afterever/claude-mods
+claude plugin marketplace add afterever/claude-craftkits
 claude plugin install ctx@afterever-mods
 ```
 
@@ -143,7 +143,7 @@ only. The band's trend takes the pane's colours.
 Load it from disk, which hot-reloads on save:
 
 ```
-claude --plugin-dir <path to claude-mods>/ctx
+claude --plugin-dir <path to claude-craftkits>/ctx
 ```
 
 Check it before committing, from the repository root:
