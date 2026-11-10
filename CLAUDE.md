@@ -23,6 +23,13 @@
   it. The summary of the change goes in the release body, which then points to the README's
   "What changed in <version>" section.
 
+- **Pushing the tag also publishes the mod to npm** as `@afterever/<mod>`, through
+  `.github/workflows/publish-npm.yml`. It refuses a tag that disagrees with the mod's
+  `plugin.json`, skips a version already on npm, and needs the `NPM_TOKEN` secret. The
+  marketplace installs from the relative `./<mod>` paths, so a failed publish does not block a
+  release: re-run the workflow from the Actions tab with the tag. No mod folder holds a
+  `package.json`; the package is built at publish time.
+
 ## Version rows
 
 - **Every mod with a pane ends it with a dim row, `<mod> v<version>`**, read from `VERSION` in

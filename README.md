@@ -29,6 +29,16 @@ That installs the seven mods in this repo. The whole setup, with the third-party
 
 Pick up new versions with `claude plugin marketplace update afterever-mods` and then `claude plugin update ctx@afterever-mods` (restart Claude Code to apply).
 
+## Also on npm
+
+Each release is published to npm as `@afterever/<mod>` (for example `@afterever/waypoints`), with provenance. The marketplace above is still how you install and update: it reads the mods straight from this repo, so npm is an extra copy, not a dependency. To use one from your own marketplace, give its entry an npm source:
+
+```json
+{ "name": "waypoints", "source": { "source": "npm", "package": "@afterever/waypoints" } }
+```
+
+The packages are built by `.github/scripts/build-npm-package.mjs` from each mod's `plugin.json` (no mod folder holds a `package.json`), and `.github/workflows/publish-npm.yml` publishes one when a `<mod>-v<version>` tag is pushed. Publishing needs an `NPM_TOKEN` repository secret with publish rights to the `@afterever` scope.
+
 ## Use ctx
 
 `/ctx` opens the pane and the 📊 button above the prompt toggles it. The commands, the keys inside the pane, and what to do when the pane sits above the prompt instead of docking on the right (it needs the fullscreen layout) are in [ctx/README.md](./ctx/README.md).
@@ -57,6 +67,8 @@ Bump `version` in the mod's `plugin.json` when you change it, or installed copie
 ```
 .claude-plugin/marketplace.json   the marketplace listing
 SETUP.md                          reproduce the whole mod setup on a new computer
+.github/scripts/                  check-versions.mjs (CI), build-npm-package.mjs (stages a mod for npm)
+.github/workflows/                ci.yml (every pull request), publish-npm.yml (a release tag)
 ctx/
   README.md                       install, the fullscreen layout, commands and keys
   DESIGN.md                       why each feature exists and how it is built
