@@ -11,6 +11,9 @@ name: Publish to npm
 # npm accepts the run's GitHub identity (the id-token permission below) instead.
 # Provenance is attached automatically. The workflow filename is part of that
 # trust, so renaming this file means updating all seven packages' settings.
+#
+# The last step also publishes the package to GitHub Packages, which is what
+# fills the "Packages" box on the repository homepage.
 on:
   push:
     tags:
@@ -31,6 +34,7 @@ jobs:
     permissions:
       contents: read
       id-token: write # how npm recognises this run as the trusted publisher
+      packages: write # lets GITHUB_TOKEN publish to GitHub Packages (see last step)
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
@@ -97,3 +101,26 @@ jobs:
           fi
           cd "$RUNNER_TEMP/package"
           npm publish --access public
+
+      # The same package, again on GitHub Packages, so it is listed in the
+      # "Packages" box on the repository homepage. That registry wants a login
+      # even to install, so npmjs.com stays the way people install; this copy is
+      # there for the listing. The @afterever scope matches the account that owns
+      # the repository, which GitHub requires. Trusted publishing is npmjs.com
+      # only, so this step uses the run's GITHUB_TOKEN, and provenance is off
+      # because GitHub's registry does not take npm's.
+      - name: Publish to GitHub Packages
+        env:
+          MOD: ${{ steps.tag.outputs.mod }}
+          VERSION: ${{ steps.tag.outputs.version }}
+          GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          registry=https://npm.pkg.github.com
+          npmrc="$RUNNER_TEMP/github-packages.npmrc"
+          printf '%s\n' "//npm.pkg.github.com/:_authToken=$GITHUB_PACKAGES_TOKEN" > "$npmrc"
+          if npm view "@afterever/$MOD@$VERSION" version --registry "$registry" --userconfig "$npmrc" >/dev/null 2>&1; then
+            echo "@afterever/$MOD@$VERSION is already on GitHub Packages; nothing to publish"
+            exit 0
+          fi
+          cd "$RUNNER_TEMP/package"
+          npm publish --access public --registry "$registry" --userconfig "$npmrc" --provenance=false
