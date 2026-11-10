@@ -37,7 +37,7 @@ Each release is published to npm as `@afterever/<mod>` (for example `@afterever/
 { "name": "waypoints", "source": { "source": "npm", "package": "@afterever/waypoints" } }
 ```
 
-The packages are built by `.github/scripts/build-npm-package.mjs` from each mod's `plugin.json` (no mod folder holds a `package.json`), and `.github/workflows/publish-npm.yml` publishes one when a `<mod>-v<version>` tag is pushed. Publishing needs an `NPM_TOKEN` repository secret with publish rights to the `@afterever` scope.
+The packages are built by `.github/scripts/build-npm-package.mjs` from each mod's `plugin.json` (no mod folder holds a `package.json`), and `.github/workflows/publish-npm.yml` publishes one when a `<mod>-v<version>` tag is pushed. No npm token is stored: each package lists `publish-npm.yml` as a trusted publisher on npmjs.com (user `afterever`, repository `claude-craftkits`), so npm accepts the workflow run's own GitHub identity. A new mod needs that set once on its package page, after its first publish.
 
 ## Use ctx
 

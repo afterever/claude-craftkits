@@ -4,6 +4,13 @@ name: Publish to npm
 # mod as @afterever/<mod>@<version>. The marketplace still installs from the
 # relative ./<mod> paths, so a failed publish never blocks a release; run this
 # workflow again from the Actions tab (workflow_dispatch) to retry one.
+#
+# No npm token is stored anywhere: each package lists this workflow file as a
+# trusted publisher (npmjs.com > the package > Settings > Trusted publisher:
+# user afterever, repository claude-craftkits, workflow publish-npm.yml), and
+# npm accepts the run's GitHub identity (the id-token permission below) instead.
+# Provenance is attached automatically. The workflow filename is part of that
+# trust, so renaming this file means updating all seven packages' settings.
 on:
   push:
     tags:
@@ -23,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # provenance: npm links the package to this workflow run
+      id-token: write # how npm recognises this run as the trusted publisher
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
@@ -36,10 +43,19 @@ jobs:
         with:
           ref: refs/tags/${{ github.event.inputs.tag || github.ref_name }}
           path: release
+      # Trusted publishing needs Node 22.14+ and npm 11.5.1+. There is no
+      # registry-url here on purpose: setup-node would write an .npmrc that
+      # demands a NODE_AUTH_TOKEN, which no longer exists.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
+          node-version: 24
+
+      - name: Check npm is new enough for trusted publishing
+        run: |
+          node -v
+          npm -v
+          node -e "const [a,b,c]=process.versions.node.split('.').map(Number);if(a<22||(a===22&&b<14)){console.error('::error::Node 22.14+ is needed');process.exit(1)}"
+          node -e "const [a,b,c]=require('child_process').execSync('npm -v').toString().trim().split('.').map(Number);if(a<11||(a===11&&(b<5||(b===5&&c<1)))){console.error('::error::npm 11.5.1+ is needed');process.exit(1)}"
 
       - name: Read the mod and version from the tag
         id: tag
@@ -74,11 +90,10 @@ jobs:
         env:
           MOD: ${{ steps.tag.outputs.mod }}
           VERSION: ${{ steps.tag.outputs.version }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if npm view "@afterever/$MOD@$VERSION" version >/dev/null 2>&1; then
             echo "@afterever/$MOD@$VERSION is already on npm; nothing to publish"
             exit 0
           fi
           cd "$RUNNER_TEMP/package"
-          npm publish --provenance --access public
+          npm publish --access public
