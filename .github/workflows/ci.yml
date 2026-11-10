@@ -26,6 +26,15 @@ jobs:
       - run: node .github/scripts/check-versions.mjs
       - run: npm install -g @anthropic-ai/claude-code@${{ env.CLAUDE_CODE_VERSION }}
       - run: claude plugin validate . --strict
+      # Every mod must still stage and pack as an npm package (publish-npm.yml
+      # does this for real on a release tag), so a break shows up here first.
+      - name: Dry-run the npm packages
+        run: |
+          for mod in */.claude-plugin/plugin.json; do
+            mod=${mod%%/*}
+            node .github/scripts/build-npm-package.mjs "$mod" "$RUNNER_TEMP/npm/$mod"
+            (cd "$RUNNER_TEMP/npm/$mod" && npm publish --dry-run --provenance=false --access public)
+          done
 
   test:
     name: test ${{ matrix.mod }}

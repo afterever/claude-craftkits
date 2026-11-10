@@ -1,0 +1,76 @@
+name: Publish to npm
+
+# A release tag `<mod>-v<version>` (for example `waypoints-v2.8.0`) publishes that
+# mod as @afterever/<mod>@<version>. The marketplace still installs from the
+# relative ./<mod> paths, so a failed publish never blocks a release; run this
+# workflow again from the Actions tab (workflow_dispatch) to retry one.
+on:
+  push:
+    tags:
+      - '*-v[0-9]*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish, for example waypoints-v2.8.0'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: publish ${{ github.event.inputs.tag || github.ref_name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # provenance: npm links the package to this workflow run
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ github.event.inputs.tag || github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Read the mod and version from the tag
+        id: tag
+        run: |
+          if [[ ! "$TAG" =~ ^([a-z][a-z0-9-]*)-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::tag '$TAG' is not <mod>-v<x.y.z>"
+            exit 1
+          fi
+          echo "mod=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          echo "version=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
+
+      - name: Check the tag against the manifest
+        env:
+          MOD: ${{ steps.tag.outputs.mod }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          node .github/scripts/check-versions.mjs
+          declared=$(node -p "require('./$MOD/.claude-plugin/plugin.json').version")
+          if [ "$declared" != "$VERSION" ]; then
+            echo "::error::tag says $VERSION but $MOD/.claude-plugin/plugin.json says $declared"
+            exit 1
+          fi
+
+      - name: Build the package
+        env:
+          MOD: ${{ steps.tag.outputs.mod }}
+        run: node .github/scripts/build-npm-package.mjs "$MOD" "$RUNNER_TEMP/package"
+
+      - name: Publish
+        env:
+          MOD: ${{ steps.tag.outputs.mod }}
+          VERSION: ${{ steps.tag.outputs.version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if npm view "@afterever/$MOD@$VERSION" version >/dev/null 2>&1; then
+            echo "@afterever/$MOD@$VERSION is already on npm; nothing to publish"
+            exit 0
+          fi
+          cd "$RUNNER_TEMP/package"
+          npm publish --provenance --access public
