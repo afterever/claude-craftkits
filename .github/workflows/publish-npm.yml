@@ -27,9 +27,15 @@ jobs:
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
+      # Two checkouts: the scripts come from the commit this workflow runs at, and
+      # the mod's files come from the tag. A tag made before a script existed (or
+      # before it was fixed) can then still be published, and nothing from the
+      # tag is ever run, only copied into the package.
+      - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           ref: refs/tags/${{ github.event.inputs.tag || github.ref_name }}
+          path: release
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -49,8 +55,9 @@ jobs:
         env:
           MOD: ${{ steps.tag.outputs.mod }}
           VERSION: ${{ steps.tag.outputs.version }}
+        working-directory: release
         run: |
-          node .github/scripts/check-versions.mjs
+          node "$GITHUB_WORKSPACE/.github/scripts/check-versions.mjs"
           declared=$(node -p "require('./$MOD/.claude-plugin/plugin.json').version")
           if [ "$declared" != "$VERSION" ]; then
             echo "::error::tag says $VERSION but $MOD/.claude-plugin/plugin.json says $declared"
@@ -60,7 +67,8 @@ jobs:
       - name: Build the package
         env:
           MOD: ${{ steps.tag.outputs.mod }}
-        run: node .github/scripts/build-npm-package.mjs "$MOD" "$RUNNER_TEMP/package"
+        working-directory: release
+        run: node "$GITHUB_WORKSPACE/.github/scripts/build-npm-package.mjs" "$MOD" "$RUNNER_TEMP/package"
 
       - name: Publish
         env:
