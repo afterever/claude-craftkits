@@ -25,7 +25,9 @@
 
 - **Pushing the tag also publishes the mod to npm** as `@afterever/<mod>`, through
   `.github/workflows/publish-npm.yml`. It refuses a tag that disagrees with the mod's
-  `plugin.json`, skips a version already on npm, and needs the `NPM_TOKEN` secret. The
+  `plugin.json` and skips a version already on npm. It stores no token: each package lists
+  `publish-npm.yml` as a trusted publisher on npmjs.com, so renaming that file breaks all
+  seven, and a new mod's package needs the same setting after its first publish. The
   marketplace installs from the relative `./<mod>` paths, so a failed publish does not block a
   release: re-run the workflow from the Actions tab with the tag. No mod folder holds a
   `package.json`; the package is built at publish time.
