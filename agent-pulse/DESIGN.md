@@ -101,3 +101,7 @@ A call that carries an `agentId` the box never saw spawn takes that agent up as 
 - **The whole box in one `Client`.** It would animate the border without the hook redrawing, but the label could no longer truncate to the window, the tests could no longer read the box's text, and the toggle would need a round trip through `ui.message`. The border breathes by a hook redraw at 8 fps instead, and only while Claude waits on the person.
 - **A shimmer on the label.** A `Client` region takes the width of what it draws, so a shimmering label could not give way in a narrow window, which the original fixed in 0.4.3. The shimmer runs over the fixed-width "Claude" word.
 - **A glowing border on the desktop.** A `Box` border cannot glow, and an absolute `Svg` behind the box depends on the desktop's layout. The jellyfish's glow carries the phase color instead.
+
+## Release check (1.1.3)
+
+No behaviour change. 1.1.3 is a test release that went out to all three places a mod is published: the marketplace, npm as `@afterever/agent-pulse`, and GitHub Packages (the "Packages" box on the repository homepage).

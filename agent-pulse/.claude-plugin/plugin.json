@@ -1,7 +1,7 @@
 {
   "name": "agent-pulse",
   "displayName": "Agent Pulse",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "A box above the prompt that always says what the agent is doing right now, alive with color and motion: an animated status glyph, a glowing jellyfish on the desktop, a timeline of the turn, and a history behind its triangle. Fork of Tzafrir Rehan's whats-agent-doing 0.4.3.",
   "author": {
     "name": "afterever"
