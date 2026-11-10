@@ -92,6 +92,10 @@ For `auto`, anything but `off` turns it on. `/goal clear` (or `stop`, `off`, `ca
 
 In the band, the **all tasks** button (or `g`) opens the pane. `g` is a button in the band, so it only works while the band shows; `/waypoints` always does.
 
+## What changed in 2.8.1
+
+- **The plugin's links point at the renamed repo.** The repository was renamed from `claude-mods` to `claude-craftkits`, and `homepage` and `repository` in `plugin.json` still named the old one. Nothing in how Waypoints behaves changed. This is also the first release published to npm as `@afterever/waypoints` through trusted publishing, with no stored token.
+
 ## What changed in 2.8.0
 
 - **The task list under a Waypoints call opens by itself in the terminal.** Claude's `waypoints:tasks` calls (`start`, `done`, `plan` and the rest) showed the plan clipped to a few lines and `... +13 lines`. The terminal now draws the whole list under the call. Other tools, the Desktop app, VS Code, mobile, an error and the ctrl+o view keep their usual result. It works without `/skin` and changes nothing in it. While a recording masks the screen, the list is masked like the rest of the mod.
