@@ -38,8 +38,9 @@
 - **The tag's version must equal the mod's `plugin.json` version.** The workflow refuses a
   mismatch and publishes nothing, so bump `plugin.json` (and the version row) first.
 - **After every release, check the "Publish to npm" run is green** in the Actions tab (the
-  registry can take a few minutes to show the version; `0.0.0-stage` is an npm placeholder, not
-  ours). To retry one: `gh workflow run publish-npm.yml -f tag=<tag>`.
+  registry can take a few minutes to show the version; a `0.0.0-stage` version appeared on the
+  packages with the trust setup and is not one of ours). To retry one:
+  `gh workflow run publish-npm.yml -f tag=<tag>`.
 - **No token is stored anywhere.** Each package lists `publish-npm.yml` as a trusted publisher
   on npmjs.com (user `afterever`, repository `claude-craftkits`, no environment). Never rename
   that file: all seven packages would stop accepting the publish and each needs
