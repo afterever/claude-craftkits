@@ -41,6 +41,11 @@
   registry can take a few minutes to show the version; each package also lists a `0.0.0-stage`
   stub that npm created at its first publish, which is harmless: leave it). To retry one:
   `gh workflow run publish-npm.yml -f tag=<tag>`.
+- **The same workflow also publishes to GitHub Packages**, which is what fills the "Packages" box on
+  the repository homepage (it only lists GitHub's own registry, never npmjs.com). It uses the run's
+  `GITHUB_TOKEN` (`packages: write`), no secret. That registry needs a login even to install, so
+  npmjs.com stays the install path. A mod that is only on npmjs.com can be added with
+  `gh workflow run publish-npm.yml -f tag=<tag>`.
 - **No token is stored anywhere.** Each package lists `publish-npm.yml` as a trusted publisher
   on npmjs.com (user `afterever`, repository `claude-craftkits`, no environment). Never rename
   that file: all seven packages would stop accepting the publish and each needs
