@@ -22,15 +22,37 @@
 - **Title it `<mod> <version>` and nothing else** (`waypoints 2.7.3`), never with a summary after
   it. The summary of the change goes in the release body, which then points to the README's
   "What changed in <version>" section.
+- **Tag the squash-merge commit on `master`**, after the version bump has merged
+  (`git tag <mod>-v<version> <merge sha>`, `git push origin <tag>`, then
+  `gh release create <tag> --verify-tag`). Never tag a branch or an earlier commit: the npm
+  package is built from the tag, so it would differ from what the marketplace serves.
 
-- **Pushing the tag also publishes the mod to npm** as `@afterever/<mod>`, through
-  `.github/workflows/publish-npm.yml`. It refuses a tag that disagrees with the mod's
-  `plugin.json` and skips a version already on npm. It stores no token: each package lists
-  `publish-npm.yml` as a trusted publisher on npmjs.com, so renaming that file breaks all
-  seven, and a new mod's package needs the same setting after its first publish. The
-  marketplace installs from the relative `./<mod>` paths, so a failed publish does not block a
-  release: re-run the workflow from the Actions tab with the tag. No mod folder holds a
-  `package.json`; the package is built at publish time.
+### Two separate paths: the marketplace and npm
+
+- **The marketplace is released by the merge to `master`, not by the tag.** Its entries use
+  relative `./<mod>` paths, so Claude Code reads the mod from `master`; machines get it on
+  `claude plugin marketplace update afterever-mods`.
+- **npm is released by pushing the tag.** `.github/workflows/publish-npm.yml` publishes
+  `@afterever/<mod>@<version>` with provenance. A failed publish does not block the release
+  or the marketplace.
+- **The tag's version must equal the mod's `plugin.json` version.** The workflow refuses a
+  mismatch and publishes nothing, so bump `plugin.json` (and the version row) first.
+- **After every release, check the "Publish to npm" run is green** in the Actions tab (the
+  registry can take a few minutes to show the version; `0.0.0-stage` is an npm placeholder, not
+  ours). To retry one: `gh workflow run publish-npm.yml -f tag=<tag>`.
+- **No token is stored anywhere.** Each package lists `publish-npm.yml` as a trusted publisher
+  on npmjs.com (user `afterever`, repository `claude-craftkits`, no environment). Never rename
+  that file: all seven packages would stop accepting the publish and each needs
+  `npm trust github` again. Do not add an `NPM_TOKEN` back.
+- **A brand-new mod's first publish is manual**, because a trusted publisher can only be set on
+  a package that already exists. Stage it with
+  `node .github/scripts/build-npm-package.mjs <mod> <dir>`, then the person runs
+  `npm publish --access public` from that folder, and then
+  `npm trust github @afterever/<mod> --file publish-npm.yml --repo afterever/claude-craftkits --allow-publish`
+  in their own terminal (it needs 2FA and npm 11.15+; Claude cannot answer the prompt). After
+  that, tags publish it. Also add the mod to the test matrix in `.github/workflows/ci.yml`.
+- **No mod folder holds a `package.json`**: the package is built at publish time from
+  `plugin.json` by `.github/scripts/build-npm-package.mjs`, which also leaves tests out.
 
 ## Version rows
 
