@@ -82,24 +82,32 @@ async function recordTask($: EngineInterface, kind: Kind, model: string) {
 
 const repoCache = new Map<string, string>()
 
-/** What `git rev-parse <args>` prints, first line; null when git says no, is missing or is slow. */
+/** What `git <args>` prints, first line; null when git says no, is missing or is slow. */
 async function gitLine($: EngineInterface, cwd: string, args: string[]): Promise<string | null> {
   try {
-    const r = await $.process.run(['git', 'rev-parse', ...args], { cwd, timeoutMs: 5000 })
+    const r = await $.process.run(['git', ...args], { cwd, timeoutMs: 5000 })
     return r.exitCode === 0 ? (r.stdout.split(/\r?\n/)[0]?.trim() || null) : null
   } catch {
     return null
   }
 }
 
-/** The repo a folder is in, by name. Asked of git once per folder; a folder git knows nothing of is named by itself. */
+/**
+ * The repo a folder is in, by name: its name on the `origin` remote, else its
+ * folder. Asked of git once per folder; a folder git knows nothing of is named by itself.
+ */
 async function repoOf($: EngineInterface, folder: string, cache = repoCache): Promise<string> {
   const hit = cache.get(folder)
   if (hit !== undefined) return hit
-  const [top, absolute] = await Promise.all([gitLine($, folder, ['--show-toplevel']), gitLine($, folder, ['--path-format=absolute', '--git-common-dir'])])
+  const [top, absolute, remote] = await Promise.all([
+    gitLine($, folder, ['rev-parse', '--show-toplevel']),
+    gitLine($, folder, ['rev-parse', '--path-format=absolute', '--git-common-dir']),
+    gitLine($, folder, ['config', '--get', 'remote.origin.url']),
+  ])
   // a git older than 2.31 has no --path-format: ask again, and the answer is read against the folder
-  const common = absolute ?? (top ? await gitLine($, folder, ['--git-common-dir']) : null)
-  const name = repoName(folder, { common, top })
+  const common = absolute ?? (top ? await gitLine($, folder, ['rev-parse', '--git-common-dir']) : null)
+  // outside a repo, `git config` reads the person's global settings: a remote counts only inside one
+  const name = repoName(folder, { common, top, remote: top !== null || common !== null ? remote : null })
   // only what git confirmed is kept: a slow answer must not stick for the whole session
   if (top !== null || common !== null) cache.set(folder, name)
   return name

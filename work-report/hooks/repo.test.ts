@@ -1,6 +1,30 @@
 import { test, expect } from 'claude-code/testing'
 
-import { repoName } from './repo'
+import { remoteName, repoName } from './repo'
+
+test('a remote\'s name is the last part of its URL, however it is written', () => {
+  expect(remoteName('git@github.com:afterever/claude-craftkits.git')).toBe('claude-craftkits')
+  expect(remoteName('https://github.com/afterever/claude-craftkits.git')).toBe('claude-craftkits')
+  expect(remoteName('https://github.com/afterever/claude-craftkits/')).toBe('claude-craftkits')
+  expect(remoteName('ssh://git@host:2222/team/proj')).toBe('proj')
+  expect(remoteName('/srv/git/proj.git')).toBe('proj')
+  expect(remoteName('C:\\git\\proj.git')).toBe('proj')
+  expect(remoteName('')).toBe('')
+  expect(remoteName(null)).toBe('')
+})
+
+test('the name on the remote comes first: two checkouts of one repo, and a renamed folder, are one repo', () => {
+  const remote = 'git@github.com:afterever/claude-craftkits.git'
+  expect(repoName('E:/github/claude-mods', { top: 'E:/github/claude-mods', common: 'E:/github/claude-mods/.git', remote })).toBe('claude-craftkits')
+  expect(repoName('E:/github/claude-craftkits', { top: 'E:/github/claude-craftkits', common: 'E:/github/claude-craftkits/.git', remote })).toBe('claude-craftkits')
+  expect(repoName('E:/work/anything-else', { top: 'E:/work/anything-else', common: 'E:/github/claude-mods/.git', remote })).toBe('claude-craftkits')
+})
+
+test('a repo with no remote, or a remote that names nothing, is named by its folder', () => {
+  expect(repoName('E:/github/bats', { top: 'E:/github/bats', common: 'E:/github/bats/.git', remote: null })).toBe('bats')
+  expect(repoName('E:/github/bats', { top: 'E:/github/bats', common: 'E:/github/bats/.git', remote: '' })).toBe('bats')
+  expect(repoName('E:/github/bats', { top: 'E:/github/bats', common: 'E:/github/bats/.git', remote: '/' })).toBe('bats')
+})
 
 test('the repo is the folder that holds the shared .git, however deep the session is', () => {
   expect(repoName('E:/github/claude-mods/work-report', { top: 'E:/github/claude-mods', common: 'E:/github/claude-mods/.git' })).toBe('claude-mods')

@@ -12,6 +12,9 @@ const GOLD = '#F2C46D'
 const DARK = '#0D1117'
 const SLATE = '#262B33'
 
+/** What git answers from a folder: its top level, its shared .git folder and, when it has one, its origin remote. */
+type GitWorld = { top: string; common: string; remote?: string }
+
 type Opts = {
   /** Whether the pane can be seated. */
   placed?: boolean
@@ -19,7 +22,7 @@ type Opts = {
   /** Holds ui.open until this resolves. */
   hold?: Promise<void>
   /** What git answers from a folder: its top level and shared .git folder. Absent: not a repo, git says no. */
-  git?: { top: string; common: string } | ((cwd: string) => { top: string; common: string } | null)
+  git?: GitWorld | ((cwd: string) => GitWorld | null)
   /** The folder the session is in. */
   root?: string
   /** Files on disk by path, for the backfill; present, the mod finds `C:/home/.claude`. */
@@ -73,6 +76,7 @@ function world(on: On, o: Opts = {}) {
       const answer = (stdout: string) => ({ value: { exitCode: 0, stdout: `${stdout}\n`, stderr: '' } })
       const git = typeof o.git === 'function' ? o.git(String((e as { init?: { cwd?: string } }).init?.cwd ?? '').replace(/\\/g, '/')) : o.git
       if (!git) return { value: { exitCode: 128, stdout: '', stderr: 'fatal: not a git repository' } } as any
+      if (e.argv[1] === 'config') return (git.remote ? answer(git.remote) : { value: { exitCode: 1, stdout: '', stderr: '' } }) as any
       if (flag === '--show-toplevel') return answer(git.top) as any
       return answer(git.common) as any
     })
@@ -879,6 +883,33 @@ test('/work-report backfill counts the typed prompts in saved sessions, by day a
   expect(reposOf(w.stored, TODAY)).toEqual({ 'claude-mods': 2, bats: 1 })
   // the tasks, models and so the hours and dollars are as they were
   expect(dayOf(w.stored)).toMatchObject({ kinds: { code: 2 }, models: { 'Opus 5.5': 2 } })
+})
+
+// Two checkouts of one repo, in folders with other names than the repo's own
+const TWO_CHECKOUTS = (cwd: string): GitWorld | null => {
+  const remote = 'git@github.com:afterever/claude-craftkits.git'
+  if (cwd.startsWith('E:/github/claude-craftkits')) return { top: 'E:/github/claude-craftkits', common: 'E:/github/claude-craftkits/.git', remote }
+  if (cwd.startsWith('C:/bats')) return { top: 'C:/bats', common: 'C:/bats/.git' }
+  return { top: 'E:/github/claude-mods', common: 'E:/github/claude-mods/.git', remote }
+}
+
+test('two checkouts of one repo are one repo, named as the remote names it, in a backfill and when typing', async ($, on) => {
+  const disk = {
+    ...SESSIONS,
+    'C:/home/.claude/projects/E--github-claude-craftkits/s3.jsonl': row({ promptId: 'k1', cwd: 'E:/github/claude-craftkits', timestamp: at(13, 11) }),
+  }
+  const w = world(on, { git: TWO_CHECKOUTS, disk, root: 'E:/github/claude-craftkits' })
+  await start($)
+  await $.command.run(cmd('backfill'))
+  await until(() => w.toasts.length > 0)
+  // claude-mods' four prompts and the craftkits folder's one are all claude-craftkits; bats has no remote
+  expect(w.toasts[0]).toContain('counted 6 typed prompts in 2 repos')
+  expect(reposOf(w.stored, TODAY)).toEqual({ 'claude-craftkits': 3, bats: 1 })
+  expect(reposOf(w.stored, 'day:2026-10-12')).toEqual({ 'claude-craftkits': 2 })
+  // and a prompt typed in the other checkout lands on the same row
+  await finish($, { text: 'now typing in the craftkits folder' })
+  await until(() => reposOf(w.stored, TODAY)?.['claude-craftkits'] === 4)
+  expect(reposOf(w.stored, TODAY)).toEqual({ 'claude-craftkits': 4, bats: 1 })
 })
 
 test('a session over the engine\'s 4 MiB limit is searched for its human lines instead: findstr on Windows', async ($, on) => {

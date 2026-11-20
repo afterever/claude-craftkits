@@ -62,7 +62,7 @@ One typed request that finishes with an answer is one task.
 
 A prompt is counted the moment it goes through, so unlike a task it is also counted when its turn is cancelled or fails. The same prompts count as for a task: what you typed, a message from the phone, and an upgraded prompt another mod sent as your own words. Slash commands, notifications, schedules, helper agents and `claude -p` runs are not counted, and neither is a prompt another hook held back.
 
-The repo is **the folder that holds the repo's shared `.git`**, found with `git rev-parse`. A session in a subfolder, or in a worktree, counts for the same repo as one in its top folder. A folder git knows nothing of is counted under its own name. Two repos whose folders have the same name are added together, and renaming a folder starts a new name: counts under the old one stay where they were.
+A prompt is counted under **the repo's name on its `origin` remote** (`git@github.com:me/proj.git` is `proj`), so two checkouts of one repo, and a folder you renamed, are one row. A repo with no remote is named by **the folder that holds its shared `.git`**, so a session in a subfolder or a worktree counts for the same repo as one in its top folder. A folder git knows nothing of is counted under its own name. Two repos with the same name are added together, and a repo you rename on GitHub starts a new row: counts under the old name stay where they were.
 
 ### How a task is sorted
 
@@ -136,13 +136,13 @@ A day's record is read back from the store before each change, and changes are m
 
 None. The mod makes no model calls: it listens to events and counts. Recording a task shows nothing; it speaks up only when you ask for the pane and the window is too narrow to open it, or a button press fails.
 
-Counting a prompt runs `git rev-parse` in your session's folder (once per folder, then remembered). It happens after the prompt has gone through, so it never delays one. `/work-report backfill` reads your saved sessions and, for a session over 4 MiB, runs `findstr` or `grep` on it.
+Counting a prompt runs three quick `git` reads in your session's folder (once per folder, then remembered). It happens after the prompt has gone through, so it never delays one. `/work-report backfill` reads your saved sessions and, for a session over 4 MiB, runs `findstr` or `grep` on it.
 
 ## What changed in 0.5.0
 
-- **A "Prompts you typed" block, by repo.** Under "Who did the work", one row per repo with the number of prompts you typed there, on every tab: Today, Week, Month and Year. A prompt is counted when it goes through, in the repo the session's folder belongs to, so worktrees and subfolders count for the repo they are in.
+- **A "Prompts you typed" block, by repo.** Under "Who did the work", one row per repo with the number of prompts you typed there, on every tab: Today, Week, Month and Year. A prompt is counted when it goes through, under the repo the session's folder belongs to, named as its remote names it, so checkouts, worktrees and subfolders of one repo are one row.
 - **`/work-report backfill` fills in your recent history.** It counts the prompts you typed in the sessions Claude Code has saved, by day and repo, and is safe to run again. Claude Code deletes saved sessions after 30 days, so run it soon after updating. Only prompts are touched: tasks, hours and dollars stay as they were.
-- **The mod now runs `git`, and reads your saved sessions when you ask.** `git rev-parse` once per folder to name the repo, and `findstr` or `grep` on a saved session over 4 MiB during a backfill. Still no model calls, and still only counts are stored.
+- **The mod now runs `git`, and reads your saved sessions when you ask.** `git` (`rev-parse` and `config --get remote.origin.url`) once per folder to name the repo, and `findstr` or `grep` on a saved session over 4 MiB during a backfill. Still no model calls, and still only counts are stored.
 - The pane asks for 46 rows instead of 38, to hold the new block.
 
 ## Install
@@ -184,7 +184,7 @@ hooks/report.ts               totals, the estimate, the streak, chart bars, mode
 hooks/dates.ts                local-noon day stepping, ranges, the day of the year
 hooks/kinds.ts                sorting a task by its tools
 hooks/record.ts               which prompts count, and claiming a turn
-hooks/repo.ts                 a repo's name, from what git says of the session's folder
+hooks/repo.ts                 a repo's name, from its remote or what git says of the session's folder
 hooks/history.ts              typed prompts found in saved sessions, bucketed by day and repo
 hooks/*.test.ts               kinds, typed prompts, repos, saved sessions, dates, totals, layout, drawings and the full flow
 types/index.d.ts              the mod's $.state contract

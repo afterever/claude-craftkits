@@ -1,9 +1,14 @@
-// Which repo a prompt belongs to. The name is the folder of the repo's top
-// level, worked out from what `git rev-parse` says, so a repo's worktrees and
-// subfolders count as one. Pure; register.tsx runs the git calls.
+// Which repo a prompt belongs to. The name is the repo's name on its remote
+// (`origin`), so two checkouts of one repo, and a folder that was renamed, are
+// one repo. A repo with no remote is named by the folder that holds its shared
+// `.git`, so its worktrees and subfolders still count as one. Pure;
+// register.tsx runs the git calls.
 
-/** What git said when asked from a folder: the shared `.git` folder and the top level, each null when git had no answer. */
-export type GitAnswers = { common: string | null; top: string | null }
+/**
+ * What git said when asked from a folder, each null when git had no answer: the
+ * shared `.git` folder, the top level, and the URL of the `origin` remote.
+ */
+export type GitAnswers = { common: string | null; top: string | null; remote?: string | null }
 
 const MAX_NAME = 60
 
@@ -25,14 +30,24 @@ function collapse(p: string): string {
 }
 
 /**
- * The repo's name: the folder holding the shared `.git`, else the top level,
- * else the folder the session is in (not a git repo). A git older than 2.31
- * answers `--git-common-dir` relative to the folder it ran in, so a relative
- * answer is read against `root`.
+ * The last part of a remote's URL, without `.git`: `git@github.com:me/proj.git`,
+ * `https://github.com/me/proj/` and a local `/srv/git/proj.git` are all `proj`.
+ */
+export function remoteName(url: string | null | undefined): string {
+  if (!url) return ''
+  const parts = clean(url).replace(/\.git$/i, '').split(/[/:]/)
+  return (parts.pop() ?? '').trim()
+}
+
+/**
+ * The repo's name: its name on the `origin` remote, else the folder holding the
+ * shared `.git`, else the top level, else the folder the session is in (not a
+ * git repo). A git older than 2.31 answers `--git-common-dir` relative to the
+ * folder it ran in, so a relative answer is read against `root`.
  */
 export function repoName(root: string, git: GitAnswers): string {
-  let name = ''
-  const common = git.common ? clean(git.common) : ''
+  let name = remoteName(git.remote)
+  const common = name === '' && git.common ? clean(git.common) : ''
   if (common !== '') {
     const abs = isAbsolute(common) ? common : collapse(`${clean(root)}/${common}`)
     const parent = abs.endsWith('/.git') ? abs.slice(0, -'/.git'.length) : abs.replace(/\.git$/, '')
