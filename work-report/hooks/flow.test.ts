@@ -12,6 +12,15 @@ const GOLD = '#F2C46D'
 const DARK = '#0D1117'
 const SLATE = '#262B33'
 
+// The fake disk and folders are keyed by Windows paths (`C:/home/...`). Off Windows
+// the engine reads those as relative and puts the working folder in front, so cut
+// back to the drive letter to get the key the test wrote.
+const fake = (path: string) => {
+  const slashed = path.replace(/\\/g, '/')
+  const drive = slashed.search(/(^|\/)[A-Za-z]:\//)
+  return drive < 0 ? slashed : slashed.slice(slashed[drive] === '/' ? drive + 1 : drive)
+}
+
 /** What git answers from a folder: its top level, its shared .git folder and, when it has one, its origin remote. */
 type GitWorld = { top: string; common: string; remote?: string }
 
@@ -67,14 +76,14 @@ function world(on: On, o: Opts = {}) {
     on('process.run', async (_$, e) => {
       if (e.argv[0] === 'findstr' || e.argv[0] === 'grep') {
         searched.push([...e.argv])
-        const path = String(e.argv[e.argv.length - 1]).replace(/\\/g, '/')
+        const path = fake(String(e.argv[e.argv.length - 1]))
         const text = o.disk?.[path]
         const hits = text === undefined ? '' : text.split('\n').filter(l => /kind.:.human/.test(l)).join('\n')
         return { value: { exitCode: hits === '' ? 1 : 0, stdout: hits, stderr: '' } } as any
       }
       const flag = e.argv[2]
       const answer = (stdout: string) => ({ value: { exitCode: 0, stdout: `${stdout}\n`, stderr: '' } })
-      const git = typeof o.git === 'function' ? o.git(String((e as { init?: { cwd?: string } }).init?.cwd ?? '').replace(/\\/g, '/')) : o.git
+      const git = typeof o.git === 'function' ? o.git(fake(String((e as { init?: { cwd?: string } }).init?.cwd ?? ''))) : o.git
       if (!git) return { value: { exitCode: 128, stdout: '', stderr: 'fatal: not a git repository' } } as any
       if (e.argv[1] === 'config') return (git.remote ? answer(git.remote) : { value: { exitCode: 1, stdout: '', stderr: '' } }) as any
       if (flag === '--show-toplevel') return answer(git.top) as any
@@ -83,7 +92,6 @@ function world(on: On, o: Opts = {}) {
   }
   if (o.disk) {
     const disk = o.disk
-    const fake = (p: string) => p.replace(/\\/g, '/')
     on('env.get', async (_$, e) => ({ value: e.name === 'USERPROFILE' ? 'C:/home' : e.name === 'OS' && o.windows ? 'Windows_NT' : undefined }) as any)
     on('fs.list', async (_$, e) => {
       const below = `${fake(e.path).replace(/\/+$/, '')}/`
