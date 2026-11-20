@@ -954,21 +954,42 @@ test('the pane lists the repos of the stretch, and says nothing of prompts for a
   void w
 })
 
-test('a user who has never counted a prompt is pointed to /work-report backfill', async ($, on) => {
+test('until a backfill has run, the pane points to /work-report backfill', async ($, on) => {
   world(on, { stored: SAMPLE })
   await start($)
   const ui = await mountPane($, 100)
   expect((await ui.findAll({ type: 'Text' })).some(t => t.text.includes('/work-report backfill'))).toBe(true)
 })
 
-test('a user who has counted prompts is not nagged on a stretch with none', async ($, on) => {
-  world(on, { stored: { ...SAMPLE, 'day:2026-03-02': { kinds: { research: 4 }, models: { 'Haiku 5.5': 4 }, repos: { old: 3 } } } })
+test('a prompt typed since the update does not make the hint go away: only a backfill does', async ($, on) => {
+  world(on, {
+    stored: { ...SAMPLE, [TODAY]: { kinds: { emails: 1 }, models: { 'Sonnet 5.5': 1 }, repos: { 'claude-mods': 2 } } },
+  })
+  await start($)
+  const typed = await mountPane($, 100)
+  const text = (await typed.findAll({ type: 'Text' })).map(t => t.text).join('\n')
+  expect(text).toContain('PROMPTS YOU TYPED')
+  expect(text).toContain('/work-report backfill')
+})
+
+test('a user who has run a backfill is not nagged, and a stretch with no prompts shows no empty block', async ($, on) => {
+  world(on, { stored: { ...SAMPLE, backfilled: true, 'day:2026-03-02': { kinds: { research: 4 }, models: { 'Haiku 5.5': 4 }, repos: { old: 3 } } } })
   await start($)
   const again = await mountPane($, 100)
   const text = (await again.findAll({ type: 'Text' })).map(t => t.text).join('\n')
-  // today has none, but an earlier day does: no hint, and no empty block either
   expect(text).not.toContain('/work-report backfill')
   expect(text).not.toContain('PROMPTS YOU TYPED')
+})
+
+test('finishing a backfill is remembered, and the pane stops pointing to it', async ($, on) => {
+  const w = world(on, { git: GIT_BY_FOLDER, disk: SESSIONS })
+  await start($)
+  expect(w.stored.backfilled).toBeUndefined()
+  await $.command.run(cmd('backfill'))
+  await until(() => w.toasts.length > 0)
+  expect(w.stored.backfilled).toBe(true)
+  const ui = await mountPane($, 100)
+  expect((await ui.findAll({ type: 'Text' })).some(t => t.text.includes('/work-report backfill'))).toBe(false)
 })
 
 test('the desktop draws the repo bars as a drawing, the terminal as text', async ($, on) => {

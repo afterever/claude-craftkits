@@ -12,7 +12,7 @@ import { daysFor, describeDays, keyOf, sinceWords, stretchName, TAB_NAME } from 
 import { KIND_LABEL, KIND_SHORT, KINDS } from './kinds'
 import { barRow, chartPlan, clip, COLORS, fit, KIND_TONE, padStart, strWidth, tileFace, tilePlan, TITLE } from './layout'
 import type { Line, Tone } from './layout'
-import { chartFor, estimate, hoursText, promptsOf, shownKinds, summaryFor, totalsFor, withCommas } from './report'
+import { chartFor, estimate, hoursText, shownKinds, summaryFor, totalsFor, withCommas } from './report'
 import type { Totals } from './report'
 import { barsSvg, chartSvg, drawingWidth, tilesSvg } from './svg'
 import { VERSION } from './version'
@@ -31,6 +31,8 @@ export type Model = {
   tab: Tab
   days: Readonly<Record<string, DayRecord>>
   settings: Settings
+  /** Whether a backfill has run: until it has, a line under the prompts says the count starts at the update. */
+  backfilled: boolean
   /** Now, in milliseconds. */
   now: number
   /**
@@ -282,18 +284,30 @@ function countRows(el: El, width: number, counts: Record<string, number>, tone: 
   return rows.map(([name, count]) => lineRow(el, barRow(width, labelWidth, { label: name, count, max, tail: padStart(String(count), cw), tone })))
 }
 
-/** The prompts you typed, by repo, for the stretch; nothing at all when there are none, bar a hint while none was ever counted. */
-function promptsBlock(el: El, width: number, totals: Totals, hasEver: boolean, Svg?: SvgEl) {
+/**
+ * The prompts you typed, by repo, for the stretch; nothing at all when there are
+ * none. Until a backfill has been run, a line says the count starts at the
+ * update and names the command, so a user who has typed a prompt since still finds it.
+ */
+function promptsBlock(el: El, width: number, totals: Totals, backfilled: boolean, Svg?: SvgEl) {
   const { Box } = el
+  const hint = backfilled
+    ? ''
+    : fit(width, ['Counted since you updated. /work-report backfill adds the prompts in your saved sessions.', 'Since the update. /work-report backfill adds earlier ones.', ''])
+  const hintRow = hint === '' ? null : lineRow(el, [{ t: hint, tone: 'muted' }])
   if (totals.prompts === 0) {
-    if (hasEver) return null
-    const hint = fit(width, ['Prompts you typed are counted from now on. /work-report backfill adds the ones in your saved sessions.', 'Prompts: /work-report backfill adds past ones.', ''])
-    return hint === '' ? null : <Box flexDirection="column" width="100%">{lineRow(el, [{ t: hint, tone: 'muted' }])}{blank(el)}</Box>
+    return hintRow === null ? null : (
+      <Box flexDirection="column" width="100%">
+        {hintRow}
+        {blank(el)}
+      </Box>
+    )
   }
   return (
     <Box flexDirection="column" width="100%">
       {heading(el, width, 'Prompts you typed', `${withCommas(totals.prompts)} in all`)}
       {countRows(el, width, totals.repos, 'blue', Svg)}
+      {hintRow}
       {blank(el)}
     </Box>
   )
@@ -310,7 +324,6 @@ export function drawPane(el: El, m: Model, a: Actions) {
   const versionRow = lineRow(el, [{ t: `work-report v${VERSION}`, tone: 'muted' }])
   const days = daysFor(m.tab, m.now)
   const totals = totalsFor(m.days, days.map(keyOf))
-  const hasEver = Object.values(m.days).some(d => promptsOf(d) > 0)
   const header = (
     <Box flexDirection="column" width="100%">
       {top(el)}
@@ -336,7 +349,7 @@ export function drawPane(el: El, m: Model, a: Actions) {
           </Text>
         </Box>
         {blank(el)}
-        {promptsBlock(el, width, totals, hasEver, m.Svg)}
+        {promptsBlock(el, width, totals, m.backfilled, m.Svg)}
         {versionRow}
       </Box>
     )
@@ -376,7 +389,7 @@ export function drawPane(el: El, m: Model, a: Actions) {
       {heading(el, width, 'Who did the work')}
       {countRows(el, width, totals.models, 'gold', m.Svg)}
       {blank(el)}
-      {promptsBlock(el, width, totals, hasEver, m.Svg)}
+      {promptsBlock(el, width, totals, m.backfilled, m.Svg)}
       {heading(el, width, 'Tasks', m.tab === 'year' ? 'per month' : 'per day')}
       {chart}
       {blank(el)}

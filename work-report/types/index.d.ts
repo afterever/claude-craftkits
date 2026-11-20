@@ -33,6 +33,8 @@ declare module 'claude-code' {
       settings: Settings
       /** The tab the pane is on. */
       tab: Tab
+      /** Whether a backfill has ever finished; until it has, the pane points to it. Mirrors the store's `backfilled`. */
+      backfilled: boolean
     }
   }
 }

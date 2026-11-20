@@ -22,6 +22,8 @@ const PANE_ARGS = { id: PANE, title: 'Work Report', focus: true, closeOnEscape: 
 const daysAtom = atom({ plugin: 'work-report', key: 'days' } as const, {})
 const settingsAtom = atom({ plugin: 'work-report', key: 'settings' } as const, DEFAULT_SETTINGS)
 const tabAtom = atom({ plugin: 'work-report', key: 'tab' } as const, 'today')
+// Whether a backfill has ever finished: until it has, the pane points to it
+const backfilledAtom = atom({ plugin: 'work-report', key: 'backfilled' } as const, false)
 
 const DAY_PREFIX = 'day:'
 const TAB_WORDS: readonly Tab[] = ['today', 'week', 'month', 'year']
@@ -48,6 +50,8 @@ async function loadAll($: EngineInterface) {
   await update($, daysAtom, () => days)
   const settings = normalizeSettings(await $.store.get('settings'))
   await update($, settingsAtom, () => settings)
+  const backfilled = (await $.store.get('backfilled')) === true
+  await update($, backfilledAtom, () => backfilled)
 }
 
 // Every change to a day is a read, an edit and a write; one after another, so a
@@ -190,6 +194,13 @@ async function backfill($: EngineInterface): Promise<string> {
       prompts += n
     }
   }
+  // it has run: the pane stops pointing to it
+  try {
+    await $.store.set('backfilled', true)
+  } catch {
+    // shown for this session still
+  }
+  await update($, backfilledAtom, () => true)
   if (prompts === 0) return `Work Report read ${files} saved ${files === 1 ? 'session' : 'sessions'} and found no prompts you typed.`
   return (
     `Work Report counted ${prompts} typed ${prompts === 1 ? 'prompt' : 'prompts'} in ${repos.size} ${repos.size === 1 ? 'repo' : 'repos'} over ${Object.keys(days).length} ${Object.keys(days).length === 1 ? 'day' : 'days'}, ` +
@@ -449,6 +460,7 @@ export const register: Register = on => {
     const days = (await read($, daysAtom)) ?? {}
     const settings = normalizeSettings(await read($, settingsAtom))
     const tab = (await read($, tabAtom)) ?? 'today'
+    const backfilled = (await read($, backfilledAtom)) === true
     const now = await $.clock.now()
     const width = Math.max(20, Math.min(110, e.props.bodyColumns || PANE_ARGS.columns))
     const press =
@@ -458,7 +470,7 @@ export const register: Register = on => {
       }
     // the terminal's table answers Svg too but draws it empty: its figures are text
     const Svg = e.surface === 'terminal' ? undefined : (el as unknown as Partial<Elements['desktop']>).Svg
-    return drawPane(el, { width, tab, days, settings, now, ...(Svg ? { Svg } : {}) }, { pickTab: t => press(() => update($, tabAtom, () => t))() })
+    return drawPane(el, { width, tab, days, settings, backfilled, now, ...(Svg ? { Svg } : {}) }, { pickTab: t => press(() => update($, tabAtom, () => t))() })
   })
 
   // The one button: a chip above the prompt that opens the pane. The band is
