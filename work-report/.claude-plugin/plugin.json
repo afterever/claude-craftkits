@@ -1,6 +1,6 @@
 {
   "name": "work-report",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "A pane that shows what Claude has done for you: tasks finished, an estimate of the hours that saved you, and what that time is worth. Tabs for Today, Week, Month and Year. /work-report opens it.",
   "author": {
     "name": "afterever"

@@ -14,7 +14,7 @@ const count = (v: unknown): number => (typeof v === 'number' && Number.isFinite(
 export function normalizeDay(raw: unknown): DayRecord {
   const out = emptyDay()
   if (!raw || typeof raw !== 'object') return out
-  const r = raw as { kinds?: unknown; models?: unknown }
+  const r = raw as { kinds?: unknown; models?: unknown; repos?: unknown }
   if (r.kinds && typeof r.kinds === 'object') {
     for (const k of KINDS) {
       const n = count((r.kinds as Record<string, unknown>)[k])
@@ -27,6 +27,19 @@ export function normalizeDay(raw: unknown): DayRecord {
       if (n > 0) out.models[name] = n
     }
   }
+  const repos = countsOf(r.repos)
+  if (Object.keys(repos).length > 0) out.repos = repos
+  return out
+}
+
+/** A name-to-count map as the store gave it back: bad numbers and empty names dropped. */
+function countsOf(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {}
+  if (!raw || typeof raw !== 'object') return out
+  for (const [name, v] of Object.entries(raw as Record<string, unknown>)) {
+    const n = count(v)
+    if (n > 0 && name.trim() !== '') out[name] = n
+  }
   return out
 }
 
@@ -36,7 +49,13 @@ export function tasksOf(rec: DayRecord | undefined): number {
   return KINDS.reduce((n, k) => n + (rec.kinds[k] ?? 0), 0)
 }
 
-/** Two days added together: the counts of each kind and of each model summed. */
+/** How many prompts a day holds, over every repo. */
+export function promptsOf(rec: DayRecord | undefined): number {
+  if (!rec?.repos) return 0
+  return Object.values(rec.repos).reduce((n, v) => n + v, 0)
+}
+
+/** Two days added together: the counts of each kind, of each model and of each repo summed. */
 export function mergeDays(a: DayRecord, b: DayRecord): DayRecord {
   const out = emptyDay()
   for (const k of KINDS) {
@@ -46,6 +65,11 @@ export function mergeDays(a: DayRecord, b: DayRecord): DayRecord {
   for (const src of [a.models, b.models]) {
     for (const [name, n] of Object.entries(src)) out.models[name] = (out.models[name] ?? 0) + n
   }
+  const repos: Record<string, number> = {}
+  for (const src of [a.repos, b.repos]) {
+    for (const [name, n] of Object.entries(src ?? {})) repos[name] = (repos[name] ?? 0) + n
+  }
+  if (Object.keys(repos).length > 0) out.repos = repos
   return out
 }
 
@@ -54,12 +78,37 @@ export function addTask(rec: DayRecord, kind: Kind, model: string): DayRecord {
   return mergeDays(rec, { kinds: { [kind]: 1 }, models: { [model]: 1 } })
 }
 
+/** One more typed prompt on a day, in the named repo. */
+export function addPrompt(rec: DayRecord, repo: string): DayRecord {
+  return mergeDays(rec, { kinds: {}, models: {}, repos: { [repo]: 1 } })
+}
+
+/**
+ * Prompts found in saved sessions, folded into a day: for each repo the larger
+ * of what the day holds and what was found, so running a backfill twice, or
+ * after the live counter has started, never counts a prompt twice.
+ */
+export function absorbPrompts(rec: DayRecord, found: Readonly<Record<string, number>>): DayRecord {
+  const repos: Record<string, number> = { ...(rec.repos ?? {}) }
+  for (const [name, n] of Object.entries(found)) {
+    const have = repos[name] ?? 0
+    if (n > have) repos[name] = n
+  }
+  const out: DayRecord = { kinds: { ...rec.kinds }, models: { ...rec.models } }
+  if (Object.keys(repos).length > 0) out.repos = repos
+  return out
+}
+
 // ── Totals ───────────────────────────────────────────────────────────────
 
 export type Totals = {
   tasks: number
   kinds: Record<Kind, number>
   models: Record<string, number>
+  /** Typed prompts by repo, over the stretch. */
+  repos: Record<string, number>
+  /** Typed prompts in all, over the stretch. */
+  prompts: number
   /** Tasks on each of the given days, in order. */
   perDay: number[]
 }
@@ -75,7 +124,7 @@ export function totalsFor(days: Readonly<Record<string, DayRecord>>, keys: reado
   }
   const kinds = {} as Record<Kind, number>
   for (const k of KINDS) kinds[k] = sum.kinds[k] ?? 0
-  return { tasks: KINDS.reduce((n, k) => n + kinds[k], 0), kinds, models: sum.models, perDay }
+  return { tasks: KINDS.reduce((n, k) => n + kinds[k], 0), kinds, models: sum.models, repos: sum.repos ?? {}, prompts: promptsOf(sum), perDay }
 }
 
 /**

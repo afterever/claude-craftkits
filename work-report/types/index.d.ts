@@ -6,6 +6,11 @@ export type DayRecord = {
   kinds: Partial<Record<Kind, number>>
   /** By the model's short name ("Sonnet 5.5"), never by an id. */
   models: Record<string, number>
+  /**
+   * Prompts typed that day, by repo name (the folder of the repo's top level).
+   * Left out of a record that has none, so a day from before 0.5.0 reads back as it was.
+   */
+  repos?: Record<string, number>
 }
 
 /** What the estimate is worked out from. */
@@ -28,6 +33,8 @@ declare module 'claude-code' {
       settings: Settings
       /** The tab the pane is on. */
       tab: Tab
+      /** Whether a backfill has ever finished; until it has, the pane points to it. Mirrors the store's `backfilled`. */
+      backfilled: boolean
     }
   }
 }
