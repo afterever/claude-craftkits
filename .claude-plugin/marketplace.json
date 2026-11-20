@@ -39,6 +39,15 @@
       "name": "waypoints",
       "source": "./waypoints",
       "description": "A route for /goal and any multi-step work, built from Claude's own task plan: the plan as nodes and legs above the prompt, an ETA, a pane that opens by itself with the whole task trail, and every chat's goal in /waypoints. Follows Agent-Pulse's palette and animation. The mod itself asks Claude to plan, so no line in the global CLAUDE.md. Fork of Nate Herk's goal-meter."
+    },
+    {
+      "name": "skins",
+      "source": {
+        "source": "github",
+        "repo": "afterever/claude-skins",
+        "ref": "afterever"
+      },
+      "description": "Skins for Claude Code: tool rows, diff, table and Mermaid cards, a usage band and themes, with an optional prompt-box border, text and fill, and a first run that starts as cupertino. Fork of hellosverre's claude-skins, kept in its own repo."
     }
   ]
 }

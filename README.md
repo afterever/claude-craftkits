@@ -11,6 +11,7 @@ Craft kits: a personal toolkit of [Claude Code mods](https://code.claude.com/doc
 | [`agent-pulse`](./agent-pulse) | A box above the prompt that says what Claude is doing right now, in plain English, alive with color and motion: a spinner per phase, a border that flashes when a call ends and breathes while Claude waits on you, a timeline of the turn, and a jellyfish on the desktop. Fork of Tzafrir Rehan's whats-agent-doing; what changed: [agent-pulse/README.md](./agent-pulse/README.md). Why: [agent-pulse/DESIGN.md](./agent-pulse/DESIGN.md). |
 | [`arsenal`](./arsenal) | A menu for the tool mods: a `◆ Arsenal ▾` button right above the prompt box opens a menu pane, docked on the right, with a Prompt Upgrade on/off switch, a Sound notifications switch with two sounds (one when you press Enter, one when a reply is done or Claude asks you something, from sounds you drop in a folder), and one-press shortcuts to `/prompt-upgrade` and `/work-report`. USER and PROJECT sections list your own skills and commands, each of which you can turn off. A remote control for the tools, with one thing of its own, the sound notifications; it shows the model and effort but never changes them. Idea from [tristenobrien.ai](https://tristenobrien.ai/); sound notifications idea from [angomedia/claude-mods](https://github.com/angomedia/claude-mods); how to use it: [arsenal/README.md](./arsenal/README.md). Why: [arsenal/DESIGN.md](./arsenal/DESIGN.md). |
 | [`waypoints`](./waypoints) | A route for `/goal` and any multi-step work, built from Claude's own task plan: the plan drawn as nodes and legs above the prompt, an ETA at the goal's own pace, a pane that opens by itself with the whole task trail, and every chat's goal in `/waypoints`. Follows Agent-Pulse's palette and animation. The mod itself asks Claude to plan, so nothing goes in the global `CLAUDE.md`. Fork of Nate Herk's goal-meter; what changed: [waypoints/README.md](./waypoints/README.md). |
+| `skins` ([afterever/claude-skins](https://github.com/afterever/claude-skins)) | Colour schemes and a richer transcript for Claude Code: tool rows, diff, table and Mermaid cards, a usage band and themes, switched live with `/skin`. Fork of [hellosverre/claude-skins](https://github.com/hellosverre/claude-skins), kept in its own repo and installed from this marketplace: it adds optional prompt-box `border`, `promptFg` and `promptBg` slots, and a built-in `cupertino` skin that a first run starts with. What to do when upstream ships a release: [FORK.md](https://github.com/afterever/claude-skins/blob/afterever/FORK.md). |
 
 ## Install (each computer)
 
@@ -23,9 +24,10 @@ claude plugin install work-report@afterever-mods
 claude plugin install agent-pulse@afterever-mods
 claude plugin install arsenal@afterever-mods
 claude plugin install waypoints@afterever-mods
+claude plugin install skins@afterever-mods
 ```
 
-That installs the seven mods in this repo. The whole setup, with the third-party mods and the skins patch and skin, is in [SETUP.md](./SETUP.md).
+That installs the seven mods in this repo and `skins`, a fork that lives in its own repo. The whole setup, with the third-party mods and moving a machine from upstream's skins, is in [SETUP.md](./SETUP.md).
 
 Pick up new versions with `claude plugin marketplace update afterever-mods` and then `claude plugin update ctx@afterever-mods` (restart Claude Code to apply).
 

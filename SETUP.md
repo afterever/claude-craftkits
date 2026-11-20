@@ -9,9 +9,8 @@ file.
 Paste this into Claude Code on the new computer:
 
 > Read `SETUP.md` in the `afterever/claude-craftkits` repository and set up my Claude Code mods exactly
-> as it says: add the marketplaces and install the plugins, run `/skin words claude`, and
-> rebuild the `cupertino` skin. Show me the diff before changing any file, and run the
-> checks at the end.
+> as it says: add the marketplaces and install the plugins. Show me the diff before changing
+> any file, and run the checks at the end.
 
 ## Mods at a glance
 
@@ -22,7 +21,7 @@ Paste this into Claude Code on the new computer:
 | `prompt-upgrade` | `afterever/claude-craftkits` (this repo) | 0.2.1 | `/prompt-upgrade` turns a rough prompt into a great one before it is sent |
 | `work-report` | `afterever/claude-craftkits` (this repo) | 0.4.1 | `/work-report` shows what Claude has done for you: tasks, hours saved, what that is worth |
 | `waypoints` | `afterever/claude-craftkits` (this repo) | 2.4.0 | Task plan shown as a route above the prompt for a `/goal` or any multi-step work, with a pane that opens by itself; replaces `goal-meter` |
-| `skins` | `hellosverre/claude-skins` | 0.5.13 | Colour scheme and words for the transcript |
+| `skins` | `afterever/claude-skins`, branch `afterever` (a fork of `hellosverre/claude-skins`, listed in this repo's marketplace) | 0.5.16-afterever.1 | Colour scheme and words for the transcript, with the prompt-box border, text and fill slots, and a first run that starts as `cupertino` |
 | `superpowers` | `obra/superpowers` | 7.0.0 | Skills library: brainstorming, planning, test-driven development, debugging and review workflows |
 | `agent-pulse` | `afterever/claude-craftkits` (this repo) | 1.1.0 | Box above the prompt naming the step Claude is on, in color and motion, with a step history |
 | `arsenal` | `afterever/claude-craftkits` (this repo) | 0.4.6 | Button in the footer under the prompt that opens a docked menu: Prompt Upgrade switch, Sound notifications switch with a sound for your Enter and one for Claude, shortcuts to `/prompt-upgrade` and `/work-report`, and your own skills and commands (USER and PROJECT), each of which you can turn off |
@@ -31,7 +30,6 @@ Paste this into Claude Code on the new computer:
 
 ```
 claude plugin marketplace add afterever/claude-craftkits
-claude plugin marketplace add hellosverre/claude-skins
 claude plugin marketplace add obra/superpowers
 
 claude plugin install ctx@afterever-mods
@@ -41,15 +39,18 @@ claude plugin install work-report@afterever-mods
 claude plugin install agent-pulse@afterever-mods
 claude plugin install arsenal@afterever-mods
 claude plugin install waypoints@afterever-mods
-claude plugin install skins@hellosverre-mods
+claude plugin install skins@afterever-mods
 claude plugin install superpowers@superpowers-dev
 ```
+
+A machine that still has upstream's `skins@hellosverre-mods` moves over by hand, see
+[the skins section](#move-a-machine-to-the-fork).
 
 Restart Claude Code afterwards: an installed plugin is not hot-reloaded. Pick up new versions of
 the mods in this repo with `claude plugin marketplace update afterever-mods` and then
 `claude plugin update <name>@afterever-mods`.
 
-**Auto-update.** `afterever-mods`, `hellosverre-mods` and `superpowers-dev` check for new versions
+**Auto-update.** `afterever-mods` and `superpowers-dev` check for new versions
 by themselves. It is a per-marketplace setting, `"autoUpdate": true` beside `source` in
 `extraKnownMarketplaces` in `~/.claude/settings.json`, and the `/plugin` menu toggles the same
 thing. A new version still needs a restart to load.
@@ -131,9 +132,41 @@ for a plan on its own. `/waypoints auto off` removes the line.
 
 ## skins
 
-`skins` is third-party, written against 0.5.13. Two things on top of it are mine and live nowhere
-else: one setting, `/skin words claude`, and a made skin called `cupertino`. Set the words, then
-build the skin.
+`skins` is a fork of [hellosverre/claude-skins](https://github.com/hellosverre/claude-skins), kept
+in its own repo, [afterever/claude-skins](https://github.com/afterever/claude-skins), branch
+`afterever`, and listed in this repo's marketplace (`skins@afterever-mods`). The code is not in
+this folder, so it keeps its git history and can take upstream's releases by a merge. Written
+against upstream 0.5.16.
+
+What the fork adds on top of upstream:
+
+- **Prompt-box slots.** `border`, `promptFg` and `promptBg` are optional palette slots. The first
+  is upstream PR [#101](https://github.com/hellosverre/claude-skins/pull/101), still waiting on
+  the owner; the other two are a follow-up for a "caution sign" prompt.
+- **A built-in `cupertino` skin and a first-run look.** A machine with nothing saved starts as
+  `cupertino`, with `words claude`, the rail, shimmer, band and fold off, `expand` on and `compact`
+  off. A machine that already has saved prefs keeps them. There is nothing to set and nothing to
+  rebuild.
+
+What to do when upstream ships a release is in
+[FORK.md](https://github.com/afterever/claude-skins/blob/afterever/FORK.md) in the fork, on the
+`afterever` branch.
+
+### Move a machine to the fork
+
+Back up `~/.claude/plugins/store/skins_hellosverre-mods-*.json` first: it holds the saved look and
+any made skins. Then:
+
+```
+claude plugin uninstall skins@hellosverre-mods
+claude plugin marketplace add afterever/claude-craftkits     # if this machine does not have it
+claude plugin install skins@afterever-mods
+```
+
+Restart Claude Code. Never run both `skins` plugins at once: both register `/skin` and the same
+hooks. `/skin list` should show `cupertino` as `●`. To go back to upstream, uninstall the fork,
+add `hellosverre/claude-skins` as a marketplace, install `skins@hellosverre-mods`, and rebuild
+`cupertino` from the table below.
 
 ### Setting: `/skin words claude` keeps Claude Code's own words
 
@@ -158,8 +191,11 @@ and draws the skin's words. Saved skins keep their words either way.
 
 ### The `cupertino` skin
 
-A macOS/iOS dark-mode colour scheme on the `noir` base. A made skin is stored in the skins
-plugin's own store, **not in git**, so rebuild it from the table below.
+A macOS/iOS dark-mode colour scheme on the `noir` base. In the fork it is a built-in skin
+(`hooks/themes/cupertino.ts`) and the first-run default, so there is nothing to rebuild; a made
+skin of the same name in an old store is shadowed by it. On upstream's plugin a made skin is stored
+in the plugin's own store, **not in git**, so rebuild it from the table below. The table is also the
+record of where each colour came from.
 
 **Palette.** Source: Apple Human Interface Guidelines, *Color*, system colours, dark, default
 contrast (iOS table), read on 2026-10-10 from
@@ -188,7 +224,7 @@ B-69`), so a plain page fetch returns just the title.
 Words: none set. With `/skin words claude` Claude Code's own 185 spinner and 8 done words show,
 so the skin's words are never drawn.
 
-**Rebuild.**
+**Rebuild (only on upstream's plugin; the fork has it built in).**
 
 ```
 mcp__skins__design  action=save  name=cupertino  base=noir
