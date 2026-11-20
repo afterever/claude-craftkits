@@ -21,7 +21,7 @@ Paste this into Claude Code on the new computer:
 | `prompt-upgrade` | `afterever/claude-craftkits` (this repo) | 0.2.1 | `/prompt-upgrade` turns a rough prompt into a great one before it is sent |
 | `work-report` | `afterever/claude-craftkits` (this repo) | 0.4.1 | `/work-report` shows what Claude has done for you: tasks, hours saved, what that is worth |
 | `waypoints` | `afterever/claude-craftkits` (this repo) | 2.4.0 | Task plan shown as a route above the prompt for a `/goal` or any multi-step work, with a pane that opens by itself; replaces `goal-meter` |
-| `skins` | `afterever/claude-skins`, branch `afterever` (a fork of `hellosverre/claude-skins`, listed in this repo's marketplace) | 0.5.16-afterever.1 | Colour scheme and words for the transcript, with the prompt-box border, text and fill slots, and a first run that starts as `cupertino` |
+| `skins` | `afterever/claude-skins`, branch `afterever` (a fork of `hellosverre/claude-skins`, listed in this repo's marketplace) | 0.5.16-afterever.2 | Colour scheme and words for the transcript, with the prompt-box border, text and fill slots, and a first run that starts as `cupertino` |
 | `superpowers` | `obra/superpowers` | 7.0.0 | Skills library: brainstorming, planning, test-driven development, debugging and review workflows |
 | `agent-pulse` | `afterever/claude-craftkits` (this repo) | 1.1.0 | Box above the prompt naming the step Claude is on, in color and motion, with a step history |
 | `arsenal` | `afterever/claude-craftkits` (this repo) | 0.4.6 | Button in the footer under the prompt that opens a docked menu: Prompt Upgrade switch, Sound notifications switch with a sound for your Enter and one for Claude, shortcuts to `/prompt-upgrade` and `/work-report`, and your own skills and commands (USER and PROJECT), each of which you can turn off |
@@ -145,8 +145,10 @@ What the fork adds on top of upstream:
   the owner; the other two are a follow-up for a "caution sign" prompt.
 - **A built-in `cupertino` skin and a first-run look.** A machine with nothing saved starts as
   `cupertino`, with `words claude`, the rail, shimmer, band and fold off, `expand` on and `compact`
-  off. A machine that already has saved prefs keeps them. There is nothing to set and nothing to
-  rebuild.
+  off. The built-in `cupertino` also sets `promptFg #000000` and `promptBg #E0B000`, so the typed
+  prompt draws as a bold black "caution sign" box on amber. A machine that already has saved prefs
+  keeps them, but the box comes with the skin itself, so it shows there too. There is nothing to
+  set and nothing to rebuild.
 
 What to do when upstream ships a release is in
 [FORK.md](https://github.com/afterever/claude-skins/blob/afterever/FORK.md) in the fork, on the
@@ -220,6 +222,10 @@ B-69`), so a plain page fetch returns just the title.
 | surface | `#2C2C2E` | systemGray5 | table header band |
 | zebra | `#1C1C1E` | systemGray6 | alternate table rows |
 | other | `#AEAEB2` | systemGray, increased contrast | anything else |
+
+Fork only, not in the table's 15 slots: `promptFg` `#000000` and `promptBg` `#E0B000` (a soft amber,
+not pure yellow, which glares on a dark terminal) draw the typed prompt as a sign. Upstream's
+plugin has no such slots, so the rebuild below leaves them out.
 
 Words: none set. With `/skin words claude` Claude Code's own 185 spinner and 8 done words show,
 so the skin's words are never drawn.
@@ -339,6 +345,7 @@ line of the pane says the version.
 - Run a few subagents: the progress bar fills and ends in a green Done row; `/subagent-progress` toggles
   the panel.
 - `/skin list` shows `words claude`, and `cupertino` as `●`.
+- On the fork, a typed prompt draws as a bold black box on amber.
 - In use, the spinner shows a Claude Code pool word (Clauding, Reticulating...) and the turn
   footer an original done word (Baked, Brewed, Sautéed...).
 - A multi-step request makes Claude call `mcp__waypoints__tasks` with `plan` first, and the bar
