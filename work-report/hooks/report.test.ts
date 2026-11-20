@@ -3,6 +3,8 @@ import { test, expect } from 'claude-code/testing'
 import type { DayRecord } from '../types'
 import { addDays, keyOf, noonOf } from './dates'
 import {
+  absorbPrompts,
+  addPrompt,
   addTask,
   chartFor,
   DEFAULT_SETTINGS,
@@ -14,6 +16,7 @@ import {
   monthTotals,
   normalizeDay,
   normalizeSettings,
+  promptsOf,
   shownKinds,
   streak,
   summaryFor,
@@ -53,6 +56,48 @@ test('totals over a stretch add its days and list tasks per day', () => {
   expect(week.kinds).toEqual({ emails: 1, images: 0, code: 0, documents: 1, research: 0, other: 2 })
   expect(week.models).toEqual({ 'Sonnet 5.5': 3, 'Opus 5.5': 1 })
   expect(week.perDay).toEqual([0, 0, 0, 0, 0, 1, 3])
+})
+
+test('prompts are kept by repo on the day, and a day with none reads back exactly as before', () => {
+  const a = addPrompt(addPrompt(emptyDay(), 'alpha'), 'alpha')
+  expect(a).toEqual({ kinds: {}, models: {}, repos: { alpha: 2 } })
+  expect(promptsOf(addPrompt(a, 'beta'))).toBe(3)
+  expect(promptsOf(undefined)).toBe(0)
+  // a record without repos stays without the key, so a day from before 0.5.0 is untouched
+  expect(mergeDays(day({ code: 1 }), day({ code: 1 }))).toEqual({ kinds: { code: 2 }, models: {} })
+  expect(mergeDays(a, day({ other: 1 }, { 'Opus 5.5': 1 }))).toEqual({ kinds: { other: 1 }, models: { 'Opus 5.5': 1 }, repos: { alpha: 2 } })
+  // a prompt is not a task: a day of prompts alone holds no task
+  expect(tasksOf(a)).toBe(0)
+})
+
+test('what the store gave back is made safe: bad repo counts and empty names are dropped', () => {
+  expect(normalizeDay({ kinds: {}, models: {}, repos: { alpha: 3, beta: -1, gamma: 'x', ' ': 4 } })).toEqual({ kinds: {}, models: {}, repos: { alpha: 3 } })
+  expect(normalizeDay({ kinds: { code: 1 }, models: {}, repos: 'nonsense' })).toEqual({ kinds: { code: 1 }, models: {} })
+})
+
+test('prompts found in saved sessions raise a day to what the files show, and never add to what it holds', () => {
+  const held = { kinds: { code: 1 }, models: { 'Opus 5.5': 1 }, repos: { alpha: 5, beta: 1 } } as DayRecord
+  const out = absorbPrompts(held, { alpha: 2, beta: 4, gamma: 1 })
+  expect(out.repos).toEqual({ alpha: 5, beta: 4, gamma: 1 })
+  // tasks and models are carried over untouched, and the day it was given is not changed
+  expect(out.kinds).toEqual({ code: 1 })
+  expect(out.models).toEqual({ 'Opus 5.5': 1 })
+  expect(held.repos).toEqual({ alpha: 5, beta: 1 })
+  // doing it again changes nothing
+  expect(absorbPrompts(out, { alpha: 2, beta: 4, gamma: 1 })).toEqual(out)
+})
+
+test('totals carry the prompts of the stretch by repo, and the day outside it is left out', () => {
+  const days = {
+    [ago(0)]: { kinds: { code: 1 }, models: {}, repos: { alpha: 2, beta: 1 } } as DayRecord,
+    [ago(1)]: { kinds: {}, models: {}, repos: { alpha: 3 } } as DayRecord,
+    [ago(20)]: { kinds: {}, models: {}, repos: { alpha: 9 } } as DayRecord,
+  }
+  const week = totalsFor(days, [ago(1), ago(0)])
+  expect(week.repos).toEqual({ alpha: 5, beta: 1 })
+  expect(week.prompts).toBe(6)
+  expect(week.tasks).toBe(1)
+  expect(totalsFor({}, [ago(0)]).prompts).toBe(0)
 })
 
 test('the estimate is minutes per kind, then hours, then dollars at the rate', () => {

@@ -14,6 +14,7 @@ Hours and dollars are always **estimates**: the minutes you say a task saves, ti
 | `/work-report settings rate 75` | Sets the hourly rate to 75. |
 | `/work-report settings emails 15` | Sets the minutes one email task saves to 15. Also `code`, `documents`, `images`, `research` and `other`. |
 | `/work-report settings band off` | Hides the chip above the prompt. `on` brings it back. |
+| `/work-report backfill` | Counts the prompts you typed in the sessions Claude Code has saved, so the "Prompts you typed" block starts with your recent history. Safe to run again. |
 | `/work-report help` | One line of usage. |
 
 A **Work report** chip above the prompt, with today's count beside it, opens the pane too. Claude Code has no pressable entry in the status line itself, so the button sits in the band above the prompt and keeps whatever the other mods draw there beneath it.
@@ -36,9 +37,10 @@ Under the title bar:
 1. **Three tiles** with big numerals: estimated hours saved, tasks done, estimated worth in dollars. A number too wide for big numerals is shown as plain bold text in its tile.
 2. **Where the time went**: one row per kind **that has a task in the stretch**, biggest first and Other last, with a coloured bar, the count and the estimated hours. A coder sees Code and Research; someone who makes videos sees Images and video and Documents. There is nothing to set: the rows follow what you did.
 3. **Who did the work**: one row per model, with a bar and the count. More than five models: the rest are added up as "Others".
-4. **The chart**, then one summary line.
+4. **Prompts you typed**: one row per repo, with a bar and the count, and the total at the right. More than five repos: the rest are added up as "Others". It follows the tab, so Today shows today's prompts, Week the last 7 days and so on. A stretch where you typed nothing shows no block. Until the first prompt is ever counted, a one-line hint names `/work-report backfill`.
+5. **The chart**, then one summary line.
 
-When there is nothing in the stretch yet, the pane says so in one calm sentence: *Nothing finished yet today. Your first finished task shows up here.* On the other tabs *today* becomes *in the last 7 days*, *in the last 30 days* or *this year*.
+When there is nothing in the stretch yet, the pane says so in one calm sentence: *Nothing finished yet today. Your first finished task shows up here.* On the other tabs *today* becomes *in the last 7 days*, *in the last 30 days* or *this year*. Prompts you typed in a stretch with no finished task are still listed under it.
 
 ### Narrow panes
 
@@ -55,6 +57,12 @@ One typed request that finishes with an answer is one task.
 
 - **Counted:** a prompt you typed at the prompt, a message sent from the phone, and an upgraded prompt another mod sent as your own words (for example [`prompt-upgrade`](../prompt-upgrade) after you pressed Run).
 - **Not counted:** helper agents and their steps, tool calls, cancelled or failed turns, slash commands, background notifications, scheduled prompts, other sessions' messages and `claude -p` runs.
+
+### What counts as a prompt you typed, and which repo it is in
+
+A prompt is counted the moment it goes through, so unlike a task it is also counted when its turn is cancelled or fails. The same prompts count as for a task: what you typed, a message from the phone, and an upgraded prompt another mod sent as your own words. Slash commands, notifications, schedules, helper agents and `claude -p` runs are not counted, and neither is a prompt another hook held back.
+
+The repo is **the folder that holds the repo's shared `.git`**, found with `git rev-parse`. A session in a subfolder, or in a worktree, counts for the same repo as one in its top folder. A folder git knows nothing of is counted under its own name. Two repos whose folders have the same name are added together, and renaming a folder starts a new name: counts under the old one stay where they were.
 
 ### How a task is sorted
 
@@ -110,13 +118,32 @@ Days in a row with at least one task, counted back from today. A day that has no
 
 ## What is stored
 
-Only counts, in the mod's own store: one small record per calendar day (`day:2026-10-13`, the count of each kind and the count per model) and one `settings` record (the rate, the minutes per kind and whether the chip shows). No prompt text, no file names and no answers are kept. Nothing is written inside the mod's folder.
+Only counts, in the mod's own store: one small record per calendar day (`day:2026-10-13`, the count of each kind, the count per model and, since 0.5.0, the count of prompts per repo) and one `settings` record (the rate, the minutes per kind and whether the chip shows). No prompt text, no file names and no answers are kept; the only name kept is a repo's folder name. Nothing is written inside the mod's folder.
 
-A day's record is read back from the store before each task is added, so two sessions open at once do not overwrite each other's counts.
+A day's record is read back from the store before each change, and changes are made one after another, so two sessions open at once, or a task finishing as a prompt is counted, do not overwrite each other's counts.
+
+### Backfill
+
+`/work-report backfill` reads the sessions Claude Code has saved under `~/.claude/projects` (or `CLAUDE_CONFIG_DIR`), picks out the prompts you typed, and adds them to the day and repo they belong to. Nothing leaves your machine, and only the counts are kept.
+
+- **It can only count what Claude Code still holds.** Claude Code deletes saved sessions after 30 days by default (the `cleanupPeriodDays` setting), so run it soon after you update: each day takes another day of history with it.
+- **It never counts a prompt twice.** For each day and repo it keeps the larger of what the day already holds and what the files show, so running it again, or after the live counter has started, changes nothing.
+- **It touches prompts only.** Tasks, hours and dollars stay as they were.
+- **A session over 4 MiB** is more than the engine will hand a mod, and the longest sessions hold the most prompts. Those are searched with `findstr` (Windows) or `grep` (elsewhere) for the lines that mark a human, which is all the count reads.
+- **A saved session from an older Claude Code** that does not mark who wrote a line is not counted: the mod counts only lines marked as typed by a human.
 
 ## Cost
 
 None. The mod makes no model calls: it listens to events and counts. Recording a task shows nothing; it speaks up only when you ask for the pane and the window is too narrow to open it, or a button press fails.
+
+Counting a prompt runs `git rev-parse` in your session's folder (once per folder, then remembered). It happens after the prompt has gone through, so it never delays one. `/work-report backfill` reads your saved sessions and, for a session over 4 MiB, runs `findstr` or `grep` on it.
+
+## What changed in 0.5.0
+
+- **A "Prompts you typed" block, by repo.** Under "Who did the work", one row per repo with the number of prompts you typed there, on every tab: Today, Week, Month and Year. A prompt is counted when it goes through, in the repo the session's folder belongs to, so worktrees and subfolders count for the repo they are in.
+- **`/work-report backfill` fills in your recent history.** It counts the prompts you typed in the sessions Claude Code has saved, by day and repo, and is safe to run again. Claude Code deletes saved sessions after 30 days, so run it soon after updating. Only prompts are touched: tasks, hours and dollars stay as they were.
+- **The mod now runs `git`, and reads your saved sessions when you ask.** `git rev-parse` once per folder to name the repo, and `findstr` or `grep` on a saved session over 4 MiB during a backfill. Still no model calls, and still only counts are stored.
+- The pane asks for 46 rows instead of 38, to hold the new block.
 
 ## Install
 
@@ -157,7 +184,9 @@ hooks/report.ts               totals, the estimate, the streak, chart bars, mode
 hooks/dates.ts                local-noon day stepping, ranges, the day of the year
 hooks/kinds.ts                sorting a task by its tools
 hooks/record.ts               which prompts count, and claiming a turn
-hooks/*.test.ts               kinds, typed prompts, dates, totals, layout, drawings and the full flow
+hooks/repo.ts                 a repo's name, from what git says of the session's folder
+hooks/history.ts              typed prompts found in saved sessions, bucketed by day and repo
+hooks/*.test.ts               kinds, typed prompts, repos, saved sessions, dates, totals, layout, drawings and the full flow
 types/index.d.ts              the mod's $.state contract
 ```
 

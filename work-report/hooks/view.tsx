@@ -12,7 +12,8 @@ import { daysFor, describeDays, keyOf, sinceWords, stretchName, TAB_NAME } from 
 import { KIND_LABEL, KIND_SHORT, KINDS } from './kinds'
 import { barRow, chartPlan, clip, COLORS, fit, KIND_TONE, padStart, strWidth, tileFace, tilePlan, TITLE } from './layout'
 import type { Line, Tone } from './layout'
-import { chartFor, estimate, hoursText, shownKinds, summaryFor, totalsFor, withCommas } from './report'
+import { chartFor, estimate, hoursText, promptsOf, shownKinds, summaryFor, totalsFor, withCommas } from './report'
+import type { Totals } from './report'
 import { barsSvg, chartSvg, drawingWidth, tilesSvg } from './svg'
 import { VERSION } from './version'
 
@@ -259,25 +260,43 @@ function kindRows(el: El, width: number, kinds: Record<Kind, number>, hours: Rec
   )
 }
 
-const MODEL_ROWS = 5
+const NAMED_ROWS = 5
 
-function modelRows(el: El, width: number, models: Record<string, number>, Svg?: SvgEl) {
-  const sorted = Object.entries(models).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-  const top3 = sorted.slice(0, MODEL_ROWS)
-  const rest = sorted.slice(MODEL_ROWS).reduce((n, [, c]) => n + c, 0)
+/** One bar per name, most first, the first five and then the rest added up as Others: the models, and the repos. */
+function countRows(el: El, width: number, counts: Record<string, number>, tone: Tone, Svg?: SvgEl) {
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  const top3 = sorted.slice(0, NAMED_ROWS)
+  const rest = sorted.slice(NAMED_ROWS).reduce((n, [, c]) => n + c, 0)
   const rows: [string, number][] = rest > 0 ? [...top3, ['Others', rest]] : top3
   const max = Math.max(1, ...rows.map(r => r[1]))
   const cw = String(max).length
   if (Svg) {
     const art = barsSvg(
       drawingWidth(width + 1),
-      rows.map(([name, count]) => ({ label: name, count, max, tails: [String(count)], tone: 'gold' as const })),
+      rows.map(([name, count]) => ({ label: name, count, max, tails: [String(count)], tone })),
       rows.map(([name, count]) => `${name} ${count}`).join(', '),
     )
     return [<Svg source={art.source} alt={art.alt} />]
   }
   const labelWidth = Math.min(16, Math.max(...rows.map(r => strWidth(r[0]))))
-  return rows.map(([name, count]) => lineRow(el, barRow(width, labelWidth, { label: name, count, max, tail: padStart(String(count), cw), tone: 'gold' })))
+  return rows.map(([name, count]) => lineRow(el, barRow(width, labelWidth, { label: name, count, max, tail: padStart(String(count), cw), tone })))
+}
+
+/** The prompts you typed, by repo, for the stretch; nothing at all when there are none, bar a hint while none was ever counted. */
+function promptsBlock(el: El, width: number, totals: Totals, hasEver: boolean, Svg?: SvgEl) {
+  const { Box } = el
+  if (totals.prompts === 0) {
+    if (hasEver) return null
+    const hint = fit(width, ['Prompts you typed are counted from now on. /work-report backfill adds the ones in your saved sessions.', 'Prompts: /work-report backfill adds past ones.', ''])
+    return hint === '' ? null : <Box flexDirection="column" width="100%">{lineRow(el, [{ t: hint, tone: 'muted' }])}{blank(el)}</Box>
+  }
+  return (
+    <Box flexDirection="column" width="100%">
+      {heading(el, width, 'Prompts you typed', `${withCommas(totals.prompts)} in all`)}
+      {countRows(el, width, totals.repos, 'blue', Svg)}
+      {blank(el)}
+    </Box>
+  )
 }
 
 // ── The pane ─────────────────────────────────────────────────────────────
@@ -291,6 +310,7 @@ export function drawPane(el: El, m: Model, a: Actions) {
   const versionRow = lineRow(el, [{ t: `work-report v${VERSION}`, tone: 'muted' }])
   const days = daysFor(m.tab, m.now)
   const totals = totalsFor(m.days, days.map(keyOf))
+  const hasEver = Object.values(m.days).some(d => promptsOf(d) > 0)
   const header = (
     <Box flexDirection="column" width="100%">
       {top(el)}
@@ -316,6 +336,7 @@ export function drawPane(el: El, m: Model, a: Actions) {
           </Text>
         </Box>
         {blank(el)}
+        {promptsBlock(el, width, totals, hasEver, m.Svg)}
         {versionRow}
       </Box>
     )
@@ -353,8 +374,9 @@ export function drawPane(el: El, m: Model, a: Actions) {
       {kindRows(el, width, totals.kinds, hours, m.Svg)}
       {blank(el)}
       {heading(el, width, 'Who did the work')}
-      {modelRows(el, width, totals.models, m.Svg)}
+      {countRows(el, width, totals.models, 'gold', m.Svg)}
       {blank(el)}
+      {promptsBlock(el, width, totals, hasEver, m.Svg)}
       {heading(el, width, 'Tasks', m.tab === 'year' ? 'per month' : 'per day')}
       {chart}
       {blank(el)}

@@ -18,6 +18,18 @@ type Opts = {
   stored?: Record<string, unknown>
   /** Holds ui.open until this resolves. */
   hold?: Promise<void>
+  /** What git answers from a folder: its top level and shared .git folder. Absent: not a repo, git says no. */
+  git?: { top: string; common: string } | ((cwd: string) => { top: string; common: string } | null)
+  /** The folder the session is in. */
+  root?: string
+  /** Files on disk by path, for the backfill; present, the mod finds `C:/home/.claude`. */
+  disk?: Record<string, string>
+  /** A hook after the mod's drops the prompt, as a held prompt is. */
+  drops?: boolean
+  /** Paths of files the engine refuses to hand over, as one over 4 MiB. */
+  big?: string[]
+  /** A Windows machine: the search of a big file is `findstr`, else `grep`. */
+  windows?: boolean
 }
 
 // The world beneath the mod: the store, the pane, the turn, the tools
@@ -26,6 +38,7 @@ function world(on: On, o: Opts = {}) {
   const stored: Record<string, unknown> = o.stored ?? {}
   const writes: string[] = []
   const toasts: string[] = []
+  const searched: string[][] = []
   const opened: string[] = []
   const declared: string[] = []
   const session = { id: 'sess-1' } // a /clear goes on under another
@@ -45,7 +58,47 @@ function world(on: On, o: Opts = {}) {
     declared.push(e.name)
     return { value: { command: 'work-report' } } as any
   })
-  on('prompt.submit', async (_$, e) => ({ text: e.text }) as any)
+  on('prompt.submit', async (_$, e) => (o.drops ? { drop: 'held' } : { text: e.text }) as any)
+  if (o.git || o.root || o.disk) {
+    on('session.root', async () => ({ value: o.root ?? 'C:/bats' }) as any)
+    on('process.run', async (_$, e) => {
+      if (e.argv[0] === 'findstr' || e.argv[0] === 'grep') {
+        searched.push([...e.argv])
+        const path = String(e.argv[e.argv.length - 1]).replace(/\\/g, '/')
+        const text = o.disk?.[path]
+        const hits = text === undefined ? '' : text.split('\n').filter(l => /kind.:.human/.test(l)).join('\n')
+        return { value: { exitCode: hits === '' ? 1 : 0, stdout: hits, stderr: '' } } as any
+      }
+      const flag = e.argv[2]
+      const answer = (stdout: string) => ({ value: { exitCode: 0, stdout: `${stdout}\n`, stderr: '' } })
+      const git = typeof o.git === 'function' ? o.git(String((e as { init?: { cwd?: string } }).init?.cwd ?? '').replace(/\\/g, '/')) : o.git
+      if (!git) return { value: { exitCode: 128, stdout: '', stderr: 'fatal: not a git repository' } } as any
+      if (flag === '--show-toplevel') return answer(git.top) as any
+      return answer(git.common) as any
+    })
+  }
+  if (o.disk) {
+    const disk = o.disk
+    const fake = (p: string) => p.replace(/\\/g, '/')
+    on('env.get', async (_$, e) => ({ value: e.name === 'USERPROFILE' ? 'C:/home' : e.name === 'OS' && o.windows ? 'Windows_NT' : undefined }) as any)
+    on('fs.list', async (_$, e) => {
+      const below = `${fake(e.path).replace(/\/+$/, '')}/`
+      const entries = new Map<string, 'file' | 'dir'>()
+      for (const path of Object.keys(disk)) {
+        if (!path.startsWith(below)) continue
+        const [first = '', ...more] = path.slice(below.length).split('/')
+        entries.set(first, more.length ? 'dir' : 'file')
+      }
+      if (!entries.size) throw new Error('ENOENT')
+      return { value: [...entries].map(([name, kind]) => ({ name, kind, size: 0, mtimeMs: 0, isLink: false })) } as any
+    })
+    on('fs.read', async (_$, e) => {
+      const text = disk[fake(e.path)]
+      if (text === undefined) throw new Error('ENOENT')
+      if (o.big?.includes(fake(e.path))) throw new Error(`$.fs.read: ${e.path} refused: the file is over the 4194304-byte limit`)
+      return { value: text } as any
+    })
+  }
   on('turn.start', async (_$, e) => ({ turnId: e.turnId }) as any)
   on('turn.complete', async (_$, e) => ({ text: e.answer }) as any)
   on('tool.call', async () => ({ result: 'ok', ref: 0, text: 'ok' }) as any)
@@ -60,7 +113,7 @@ function world(on: On, o: Opts = {}) {
     return { value: undefined } as any
   })
   on('ui.render', { component: 'AbovePrompt' }, async ($, e) => h($.ui.resolve(e).Box, {}) as any)
-  return { clock, stored, writes, toasts, opened, declared, session }
+  return { clock, stored, writes, toasts, searched, opened, declared, session }
 }
 
 let turns = 0
@@ -724,4 +777,207 @@ test('the settings hook\'s SessionStart, which a managed plan skips, is not need
   await start($)
   await $.classic.SessionStart({ source: 'clear' })
   expect(w.declared).toHaveLength(1)
+})
+
+// ── Prompts you typed, by repo ───────────────────────────────────────────
+
+const REPO = { top: 'E:/github/claude-mods', common: 'E:/github/claude-mods/.git' }
+const reposOf = (stored: Record<string, unknown>, key = TODAY) => (stored[key] as { repos?: Record<string, number> } | undefined)?.repos
+// real timers: the mod counts a prompt off the prompt's own path, so a test waits for the store
+declare function setTimeout(fn: (...args: unknown[]) => void, ms: number): unknown
+const settle = () => new Promise(r => setTimeout(r, 40))
+const until = async (ok: () => boolean) => {
+  for (let i = 0; i < 200 && !ok(); i++) await new Promise(r => setTimeout(r, 5))
+}
+
+test('each typed prompt is counted for its repo, even when its turn is cancelled, and tasks are counted as before', async ($, on) => {
+  // the session is in a subfolder: the repo is still the one folder git names
+  const w = world(on, { git: REPO, root: 'E:/github/claude-mods/work-report/hooks' })
+  await start($)
+  await finish($, { text: 'one' })
+  await finish($, { text: 'two' })
+  await finish($, { text: 'three', reason: 'aborted' })
+  await until(() => reposOf(w.stored)?.['claude-mods'] === 3)
+  expect(reposOf(w.stored)).toEqual({ 'claude-mods': 3 })
+  expect(dayOf(w.stored)!.kinds).toEqual({ other: 2 })
+})
+
+test('a folder git knows nothing of is counted under its own name', async ($, on) => {
+  const w = world(on, { root: 'C:/scratch/notes' })
+  await start($)
+  await finish($, { text: 'jot this down' })
+  await until(() => reposOf(w.stored) !== undefined)
+  expect(reposOf(w.stored)).toEqual({ notes: 1 })
+})
+
+test('slash commands, notifications, schedules and a mod\'s own words are not prompts; an upgraded prompt is', async ($, on) => {
+  const w = world(on, { git: REPO })
+  await start($)
+  await finish($, { text: '/compact' })
+  await finish($, { text: 'a background task finished', origin: { kind: 'task-notification' } })
+  await finish($, { text: 'the nightly check', origin: { kind: 'scheduled-trigger' } })
+  await finish($, { text: 'hello from a mod', origin: { kind: 'plugin', name: 'someone-else' } })
+  await settle()
+  expect(reposOf(w.stored)).toBeUndefined()
+  await finish($, { text: 'the upgraded prompt', origin: { kind: 'plugin', name: 'prompt-upgrade', asUser: true } })
+  await until(() => reposOf(w.stored) !== undefined)
+  expect(reposOf(w.stored)).toEqual({ 'claude-mods': 1 })
+})
+
+test('a prompt another hook held back is not counted', async ($, on) => {
+  const w = world(on, { git: REPO, drops: true })
+  await start($)
+  await finish($, { text: 'this one is held' })
+  await settle()
+  expect(reposOf(w.stored)).toBeUndefined()
+  expect(w.writes.filter(k => k.startsWith('day:'))).toEqual([])
+})
+
+test('counting a prompt never delays it: the prompt goes through before git answers', async ($, on) => {
+  const w = world(on, { git: REPO })
+  await start($)
+  const reply = await $.prompt.submit({ text: 'hello', wait: false, origin: { kind: 'composer' } })
+  expect((reply as { text?: string }).text).toBe('hello')
+  await until(() => reposOf(w.stored) !== undefined)
+  expect(reposOf(w.stored)).toEqual({ 'claude-mods': 1 })
+})
+
+// ── /work-report backfill ────────────────────────────────────────────────
+
+const at = (day: number, hour: number) => new Date(2026, 9, day, hour).toISOString()
+const row = (o: Record<string, unknown>) =>
+  JSON.stringify({ type: 'user', isSidechain: false, origin: { kind: 'human' }, message: { role: 'user', content: 'a prompt' }, cwd: 'E:/github/claude-mods', promptId: 'p0', timestamp: at(13, 9), ...o })
+const SESSIONS = {
+  'C:/home/.claude/projects/E--github-claude-mods/s1.jsonl': [
+    row({ promptId: 'p1', timestamp: at(12, 10) }),
+    row({ promptId: 'p2', timestamp: at(12, 11) }),
+    row({ promptId: 'p2', timestamp: at(12, 11) }), // the same prompt twice
+    row({ promptId: 'p3' }),
+    row({ promptId: 'p4', message: { role: 'user', content: [{ type: 'text', text: 'typed with a pasted part' }] } }),
+    // none of these were typed
+    row({ promptId: 'n1', message: { role: 'user', content: '<command-name>/compact</command-name>' } }),
+    row({ promptId: 'n2', origin: { kind: 'task-notification' } }),
+    row({ promptId: 'n3', isMeta: true }),
+    row({ promptId: 'n4', isSidechain: true }),
+    row({ promptId: 'n5', message: { role: 'user', content: [{ type: 'tool_result', content: 'ok' }] } }),
+    row({ promptId: 'n6', origin: undefined }),
+    'a line that is not JSON but says "human"',
+  ].join('\n'),
+  'C:/home/.claude/projects/C--bats/s2.jsonl': row({ promptId: 'q1', cwd: 'C:/bats', timestamp: at(13, 10) }),
+  'C:/home/.claude/projects/C--bats/notes.txt': 'not a session',
+}
+const GIT_BY_FOLDER = (cwd: string) => (cwd.startsWith('C:/bats') ? { top: 'C:/bats', common: 'C:/bats/.git' } : REPO)
+
+test('/work-report backfill counts the typed prompts in saved sessions, by day and repo, and touches nothing else', async ($, on) => {
+  const w = world(on, { git: GIT_BY_FOLDER, disk: SESSIONS, stored: { [TODAY]: { kinds: { code: 2 }, models: { 'Opus 5.5': 2 } } } })
+  await start($)
+  const reply = await $.command.run(cmd('backfill'))
+  expect(String((reply as { text?: string }).text)).toContain('Counting the prompts you typed')
+  await until(() => w.toasts.length > 0)
+  expect(w.toasts[0]).toContain('counted 5 typed prompts in 2 repos over 2 days, from 2 saved sessions')
+  expect(reposOf(w.stored, 'day:2026-10-12')).toEqual({ 'claude-mods': 2 })
+  expect(reposOf(w.stored, TODAY)).toEqual({ 'claude-mods': 2, bats: 1 })
+  // the tasks, models and so the hours and dollars are as they were
+  expect(dayOf(w.stored)).toMatchObject({ kinds: { code: 2 }, models: { 'Opus 5.5': 2 } })
+})
+
+test('a session over the engine\'s 4 MiB limit is searched for its human lines instead: findstr on Windows', async ($, on) => {
+  const big = 'C:/home/.claude/projects/E--github-claude-mods/s1.jsonl'
+  const w = world(on, { git: GIT_BY_FOLDER, disk: SESSIONS, big: [big], windows: true })
+  await start($)
+  await $.command.run(cmd('backfill'))
+  await until(() => w.toasts.length > 0)
+  // the same count as when the file was read whole, from one search of the one big file
+  expect(w.toasts[0]).toContain('counted 5 typed prompts')
+  expect(w.searched).toHaveLength(1)
+  expect(w.searched[0]![0]).toBe('findstr')
+  expect(w.searched[0]!.at(-1)).toBe(big.replace(/\//g, '\\'))
+})
+
+test('on a machine that is not Windows the big file is searched with grep', async ($, on) => {
+  const big = 'C:/home/.claude/projects/E--github-claude-mods/s1.jsonl'
+  const w = world(on, { git: GIT_BY_FOLDER, disk: SESSIONS, big: [big] })
+  await start($)
+  await $.command.run(cmd('backfill'))
+  await until(() => w.toasts.length > 0)
+  expect(w.toasts[0]).toContain('counted 5 typed prompts')
+  expect(w.searched.map(a => a[0])).toEqual(['grep'])
+})
+
+test('backfill again, or after the live counter has begun, never counts a prompt twice', async ($, on) => {
+  const w = world(on, { git: GIT_BY_FOLDER, disk: SESSIONS, stored: { [TODAY]: { kinds: {}, models: {}, repos: { 'claude-mods': 5 } } } })
+  await start($)
+  await $.command.run(cmd('backfill'))
+  await until(() => w.toasts.length > 0)
+  // the live count of 5 is larger than the 2 in the files: it stays; bats had none and gains its one
+  expect(reposOf(w.stored, TODAY)).toEqual({ 'claude-mods': 5, bats: 1 })
+  const before = JSON.stringify(w.stored)
+  await $.command.run(cmd('backfill'))
+  await until(() => w.toasts.length > 1)
+  expect(JSON.stringify(w.stored)).toBe(before)
+})
+
+test('backfill says so when there is nothing to read, and does not run twice at once', async ($, on) => {
+  const w = world(on, { git: REPO, disk: { 'C:/home/.claude/other/file.txt': 'x' } })
+  await start($)
+  const first = await $.command.run(cmd('backfill'))
+  const second = await $.command.run(cmd('backfill'))
+  expect(String((first as { text?: string }).text)).toContain('Counting')
+  expect(String((second as { text?: string }).text)).toContain('already counting')
+  await until(() => w.toasts.length > 0)
+  expect(w.toasts[0]).toContain('found no saved sessions')
+})
+
+// ── Drawn ────────────────────────────────────────────────────────────────
+
+test('the pane lists the repos of the stretch, and says nothing of prompts for a stretch with none', async ($, on) => {
+  const w = world(on, {
+    stored: {
+      ...SAMPLE,
+      [TODAY]: { kinds: { emails: 1 }, models: { 'Sonnet 5.5': 1 }, repos: { 'claude-mods': 4, bats: 2 } },
+      'day:2026-10-12': { kinds: { documents: 2 }, models: { 'Opus 5.5': 2 }, repos: { 'claude-mods': 3 } },
+    },
+  })
+  await start($)
+  const texts = async (ui: Drawing) => (await ui.findAll({ type: 'Text' })).map(t => t.text).join('\n')
+  const today = await mountPane($, 100)
+  const t = await texts(today)
+  await today.unmount()
+  expect(t).toContain('PROMPTS YOU TYPED')
+  expect(t).toContain('6 in all')
+  expect(t).toContain('claude-mods')
+  expect(t).toContain('bats')
+  // Week adds yesterday's three; Today did not
+  await $.command.run(cmd('week'))
+  const week = await texts(await mountPane($, 100))
+  expect(week).toContain('9 in all')
+  void w
+})
+
+test('a user who has never counted a prompt is pointed to /work-report backfill', async ($, on) => {
+  world(on, { stored: SAMPLE })
+  await start($)
+  const ui = await mountPane($, 100)
+  expect((await ui.findAll({ type: 'Text' })).some(t => t.text.includes('/work-report backfill'))).toBe(true)
+})
+
+test('a user who has counted prompts is not nagged on a stretch with none', async ($, on) => {
+  world(on, { stored: { ...SAMPLE, 'day:2026-03-02': { kinds: { research: 4 }, models: { 'Haiku 5.5': 4 }, repos: { old: 3 } } } })
+  await start($)
+  const again = await mountPane($, 100)
+  const text = (await again.findAll({ type: 'Text' })).map(t => t.text).join('\n')
+  // today has none, but an earlier day does: no hint, and no empty block either
+  expect(text).not.toContain('/work-report backfill')
+  expect(text).not.toContain('PROMPTS YOU TYPED')
+})
+
+test('the desktop draws the repo bars as a drawing, the terminal as text', async ($, on) => {
+  world(on, { stored: { [TODAY]: { kinds: { emails: 1 }, models: { 'Sonnet 5.5': 1 }, repos: { 'claude-mods': 4 } } } })
+  await start($)
+  const desktop = await mountPane($, 100, 'desktop')
+  expect((await desktop.findAll({ type: 'Svg' })).some(s => String(s.props.alt).includes('claude-mods 4'))).toBe(true)
+  await desktop.unmount()
+  const terminal = await mountPane($, 100, 'terminal')
+  expect((await terminal.findAll({ type: 'Svg' })).length).toBe(0)
+  expect((await terminal.findAll({ type: 'Text' })).map(x => x.text).join('\n')).toContain('claude-mods')
 })
