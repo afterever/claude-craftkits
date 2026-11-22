@@ -21,7 +21,7 @@ Paste this into Claude Code on the new computer:
 | `prompt-upgrade` | `afterever/claude-craftkits` (this repo) | 0.2.1 | `/prompt-upgrade` turns a rough prompt into a great one before it is sent |
 | `work-report` | `afterever/claude-craftkits` (this repo) | 0.4.1 | `/work-report` shows what Claude has done for you: tasks, hours saved, what that is worth |
 | `waypoints` | `afterever/claude-craftkits` (this repo) | 2.4.0 | Task plan shown as a route above the prompt for a `/goal` or any multi-step work, with a pane that opens by itself; replaces `goal-meter` |
-| `skins` | `afterever/claude-skins`, branch `afterever` (a fork of `hellosverre/claude-skins`, listed in this repo's marketplace) | 0.5.16-afterever.2 | Colour scheme and words for the transcript, with the prompt-box border, text and fill slots, and a first run that starts as `cupertino` |
+| `skins` | `afterever/claude-skins`, branch `afterever` (a fork of `hellosverre/claude-skins`, listed in this repo's marketplace) | 0.5.16-afterever.20261122 | Colour scheme and words for the transcript, with the prompt-box border, text and fill slots, and a first run that starts as `cupertino` |
 | `superpowers` | `obra/superpowers` | 7.0.0 | Skills library: brainstorming, planning, test-driven development, debugging and review workflows |
 | `agent-pulse` | `afterever/claude-craftkits` (this repo) | 1.1.0 | Box above the prompt naming the step Claude is on, in color and motion, with a step history |
 | `arsenal` | `afterever/claude-craftkits` (this repo) | 0.4.6 | Button in the footer under the prompt that opens a docked menu: Prompt Upgrade switch, Sound notifications switch with a sound for your Enter and one for Claude, shortcuts to `/prompt-upgrade` and `/work-report`, and your own skills and commands (USER and PROJECT), each of which you can turn off |
@@ -141,8 +141,9 @@ against upstream 0.5.16.
 What the fork adds on top of upstream:
 
 - **Prompt-box slots.** `border`, `promptFg` and `promptBg` are optional palette slots. The first
-  is upstream PR [#101](https://github.com/hellosverre/claude-skins/pull/101), still waiting on
-  the owner; the other two are a follow-up for a "caution sign" prompt.
+  is upstream PR [#101](https://github.com/hellosverre/claude-skins/pull/101), merged on
+  2026-11-22 and already in the fork (it ships upstream with the next release). The other two,
+  for a "caution sign" prompt, are fork only: they are not being sent upstream.
 - **A built-in `cupertino` skin and a first-run look.** A machine with nothing saved starts as
   `cupertino`, with `words claude`, the rail, shimmer, band and fold off, `expand` on and `compact`
   off. The built-in `cupertino` also sets `promptFg #000000` and `promptBg #E0B000`, so the typed
