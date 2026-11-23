@@ -43,8 +43,8 @@
     {
       "name": "skins",
       "source": {
-        "source": "github",
-        "repo": "afterever/claude-skins",
+        "source": "url",
+        "url": "https://github.com/afterever/claude-skins.git",
         "ref": "afterever"
       },
       "description": "Skins for Claude Code: tool rows, diff, table and Mermaid cards, a usage band and themes, with an optional prompt-box border, text and fill, and a first run that starts as cupertino. Fork of hellosverre's claude-skins, kept in its own repo."
