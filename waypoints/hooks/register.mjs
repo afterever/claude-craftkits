@@ -22,7 +22,7 @@
 
 import { minutes, clip, bar, basename } from './fmt.mjs'
 import { makeMasker } from './privacy.mjs'
-import { newGoal, applyAction, progress, eta, parseCheck, isStopWord, parseTasks, readCall, planSubject, resultText, TOOL_SPEC, instruction, standing, nudge, strictDeny } from './plan.mjs'
+import { newGoal, applyAction, progress, eta, parseCheck, isStopWord, parseTasks, readCall, planSubject, resultText, finishPlate, TOOL_SPEC, instruction, standing, nudge, strictDeny } from './plan.mjs'
 import { rolesOf, resolveLook } from './palette.mjs'
 import { drawBand, drawPane, statsLine, label, FULL_MS } from './draw.mjs'
 import { createAutoPane } from './pane.mjs'
@@ -52,6 +52,10 @@ let toolName = 'mcp__waypoints__tasks'
 let commandName = 'waypoints'
 let settings = { auto: true }
 let toolFailed = false
+const plates = new Map() // tool_use_id -> the words of the green plate over that call's result (finishPlate); the newest PLATES_KEPT
+const PLATES_KEPT = 50
+const PLATE_BG = '#30d158' // the green of the skins mod's cupertino `ok`; a fixed hex, because `claude` and `mono` palettes hand out theme keys
+const PLATE_FG = '#000000'
 let hidden = false
 let nudged = false
 let callsWithoutPlan = 0
@@ -317,8 +321,15 @@ async function serveTool($, sent) {
   }
   const by = e.by ? String(e.by) : e.agentId ? agentNames.get(e.agentId) || 'agent' : ''
   const firstPlan = action === 'plan' && !G.planAt
+  const wasDone = finishPlate(G) !== null
   const r = applyAction(G, e, { now, by })
   if (r.ok) {
+    // the call that finishes the plan gets the green plate; a repeat of it does not
+    const plate = action === 'done' && !wasDone && e.tool_use_id ? finishPlate(G) : null
+    if (plate) {
+      plates.set(String(e.tool_use_id), plate)
+      if (plates.size > PLATES_KEPT) plates.delete(plates.keys().next().value)
+    }
     await save($)
     $.ui.invalidate('ui.render')
     if (firstPlan && G.planAt) await maybeAutoOpen($)
@@ -796,7 +807,11 @@ export function register(on, opts) {
     }
     const { Box, Text } = $.ui.resolve(e)
     const lines = text.trimEnd().split(/\r?\n/)
-    return Box({ flexDirection: 'column', children: lines.map((l, i) => Text({ key: 'wp-result-' + i, children: [mask(l)] })) })
+    const rows = lines.map((l, i) => Text({ key: 'wp-result-' + i, children: [mask(l)] }))
+    // the call that finished the plan: one green row, black bold text, over the list
+    const plate = plates.get(String(p.tool_use_id))
+    if (plate) rows.unshift(Text({ key: 'wp-plate', backgroundColor: PLATE_BG, color: PLATE_FG, bold: true, wrap: 'truncate-end', children: [` ✓ ${mask(plate)} `] }))
+    return Box({ flexDirection: 'column', children: rows })
   })
 
   on('ui.render', { component: 'Pane' }, async ($, e, next) => {

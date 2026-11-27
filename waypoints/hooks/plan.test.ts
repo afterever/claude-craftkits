@@ -1,7 +1,7 @@
 import { test, expect } from 'claude-code/testing'
 
 // @ts-ignore the plan is plain JavaScript, shared with the module
-import { newGoal, applyAction, parseTasks, readCall, progress, eta, instruction, nudge, standing, strictDeny, planSubject, listText, TOOL_SPEC } from './plan.mjs'
+import { newGoal, applyAction, parseTasks, readCall, progress, eta, instruction, nudge, standing, strictDeny, planSubject, listText, finishPlate, TOOL_SPEC } from './plan.mjs'
 
 const TOOL = 'mcp__waypoints__tasks'
 
@@ -19,6 +19,37 @@ test('the bar counts finished work by size, not by task', async () => {
   applyAction(g, { action: 'done', ids: [2, 3] }, { now: 3000 })
   expect(progress(g).pct).toBe(100)
   expect(progress(g).doneN).toBe(3)
+})
+
+test('the finish plate says every counted task is done, and only then', async () => {
+  const g = planned()
+  expect(finishPlate(g)).toBeNull()
+  applyAction(g, { action: 'done', ids: [1, 2] }, { now: 2000 })
+  expect(finishPlate(g)).toBeNull()
+  applyAction(g, { action: 'done', id: 3 }, { now: 3000 })
+  expect(finishPlate(g)).toBe('All 3 tasks done · ship the thing')
+})
+
+test('the finish plate counts one task in the singular, leaves parked ones out and names them', async () => {
+  const one = newGoal({ sessionId: 's1', condition: 'tiny', now: 0, cwd: 'C:/bats' })
+  applyAction(one, { action: 'plan', tasks: [{ title: 'only', size: 'S' }] }, { now: 1000 })
+  applyAction(one, { action: 'done', id: 1 }, { now: 2000 })
+  expect(finishPlate(one)).toBe('All 1 task done · tiny')
+
+  const g = planned()
+  applyAction(g, { action: 'park', id: 3, note: 'waits on the other team' }, { now: 2000 })
+  expect(finishPlate(g)).toBeNull()
+  applyAction(g, { action: 'done', ids: [1, 2] }, { now: 3000 })
+  expect(finishPlate(g)).toBe('All 2 tasks done · 1 parked · ship the thing')
+})
+
+test('a plan with nothing counted has no finish plate', async () => {
+  const empty = newGoal({ sessionId: 's1', condition: 'nothing yet', now: 0, cwd: 'C:/bats' })
+  expect(finishPlate(empty)).toBeNull()
+  const parkedOnly = newGoal({ sessionId: 's1', condition: 'all parked', now: 0, cwd: 'C:/bats' })
+  applyAction(parkedOnly, { action: 'plan', tasks: [{ title: 'a', size: 'S' }] }, { now: 1000 })
+  applyAction(parkedOnly, { action: 'park', id: 1, note: 'outside' }, { now: 2000 })
+  expect(finishPlate(parkedOnly)).toBeNull()
 })
 
 test('the ETA waits for two finished tasks, then follows the goal\'s own pace', async () => {

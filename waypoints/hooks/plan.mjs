@@ -80,6 +80,16 @@ export function progress(goal) {
   }
 }
 
+// The words of the green plate over the result of the call that finishes the plan: every counted
+// task is done (a parked one waits outside the chat and a dropped one is gone, so neither blocks
+// it). Null while any counted task is open, and for a plan with none.
+export function finishPlate(goal) {
+  const p = progress(goal)
+  if (!p.n || p.doneN < p.n) return null
+  const parked = p.parked.length ? ` · ${p.parked.length} parked` : ''
+  return `All ${p.n} ${p.n === 1 ? 'task' : 'tasks'} done${parked} · ${goal.title}`
+}
+
 // The ETA at this goal's own pace: time since the plan per unit of finished
 // work, times the work left. Nothing until two tasks are done.
 export function eta(goal, now) {

@@ -26,6 +26,11 @@ function world(on: On, o: { rec?: boolean } = {}) {
   on('tool.register', async () => ({ value: { tool: TOOL } }) as any)
   on('command.register', async (_$, e) => ({ value: { command: e.name } }) as any)
   on('ui.toast', async () => ({ value: undefined }) as any)
+  // a first plan opens the pane by itself; here nothing places it
+  on('ui.open', async () => ({ value: { isPlaced: false } }) as any)
+  on('ui.close', async () => ({ value: undefined }) as any)
+  on('ui.panes', async () => ({ value: [] }) as any)
+  on('config.list', async () => ({ value: [] }) as any)
   on('prompt.compose', async () => ({ sections: [] }))
   on('ui.render', { component: 'AbovePrompt' }, async ($, e) => h($.ui.resolve(e).Box, {}) as any)
   // the engine's own result block, clipped
@@ -77,6 +82,86 @@ test('while a recording masks the screen, the result is masked too', async ($, o
   const out = await drawn($, { output: { result: 'Plan: 0 of 1 tasks done.\n#1 todo  email me@example.com (S)' } })
   expect(out).toHaveLength(2)
   expect(out.join('')).not.toContain('me@example.com')
+})
+
+// The finish plate: the call that leaves every counted task done draws one green row over its list.
+// The tool's own calls run for real here, so the plate follows the plan, not a canned result.
+const GREEN = '#30d158'
+let n = 0
+
+async function toolCall($: any, input: Record<string, unknown>) {
+  const id = 'c' + ++n
+  const r: any = await $.tool.call({ tool: TOOL, tool_use_id: id, ...input })
+  return { id, result: String(r.result) }
+}
+
+async function rowsOf($: any, c: { id: string; result: string }, surface: 'terminal' | 'desktop' = 'terminal') {
+  const ui = await $.ui.mount({ plugin: 'waypoints', surface, component: 'ToolResult', props: { tool_use_id: c.id, tool: TOOL, output: { result: c.result }, isErrored: false } })
+  const rows = (await ui.findAll({ type: 'Text' })) as any[]
+  await ui.unmount()
+  return rows
+}
+
+const started = ($: any) => $.session.start({ cwd: 'C:/bats', surface: 'terminal', isInteractive: true })
+const twoTasks = [{ title: 'read', size: 'S' }, { title: 'write', size: 'M' }]
+
+test('the call that finishes the plan draws a green plate with black text over the list', async ($, on) => {
+  world(on)
+  await started($)
+  await toolCall($, { action: 'plan', goal: 'Ship it', tasks: twoTasks })
+  const first = await toolCall($, { action: 'done', id: 1 })
+  expect((await rowsOf($, first)).map((t) => t.text)).toEqual(first.result.split('\n'))
+
+  const last = await toolCall($, { action: 'done', id: 2 })
+  const rows = await rowsOf($, last)
+  expect(rows[0].text).toBe(' ✓ All 2 tasks done · Ship it ')
+  expect(rows[0].props).toMatchObject({ backgroundColor: GREEN, color: '#000000', bold: true })
+  // the list stays under it, line for line, with no fill of its own
+  expect(rows.slice(1).map((t) => t.text)).toEqual(last.result.split('\n'))
+  expect(rows.slice(1).every((t) => t.props.backgroundColor === undefined)).toBe(true)
+})
+
+test('only a done that finishes the plan gets the plate: not a start, a show or a repeat', async ($, on) => {
+  world(on)
+  await started($)
+  const planned = await toolCall($, { action: 'plan', goal: 'Ship it', tasks: twoTasks })
+  const start = await toolCall($, { action: 'start', id: 1 })
+  await toolCall($, { action: 'done', ids: [1, 2] })
+  const repeat = await toolCall($, { action: 'done', id: 2 })
+  const show = await toolCall($, { action: 'show' })
+  for (const c of [planned, start, repeat, show]) expect((await rowsOf($, c)).map((t) => t.text)).toEqual(c.result.split('\n'))
+})
+
+test('a plan that is reopened and finished again gets a second plate', async ($, on) => {
+  world(on)
+  await started($)
+  await toolCall($, { action: 'plan', goal: 'Ship it', tasks: [{ title: 'read', size: 'S' }] })
+  const one = await toolCall($, { action: 'done', id: 1 })
+  expect((await rowsOf($, one))[0].text).toBe(' ✓ All 1 task done · Ship it ')
+  await toolCall($, { action: 'add', tasks: [{ title: 'fix', size: 'S' }] })
+  const two = await toolCall($, { action: 'done', id: 2 })
+  expect((await rowsOf($, two))[0].text).toBe(' ✓ All 2 tasks done · Ship it ')
+})
+
+test('the plate is the terminal\'s: ctrl+o and the desktop keep the stock result', async ($, on) => {
+  world(on)
+  await started($)
+  await toolCall($, { action: 'plan', goal: 'Ship it', tasks: [{ title: 'read', size: 'S' }] })
+  const c = await toolCall($, { action: 'done', id: 1 })
+  expect((await rowsOf($, c, 'desktop')).map((t) => t.text)).toEqual(['STOCK'])
+  const ui = await $.ui.mount({ plugin: 'waypoints', surface: 'terminal', component: 'ToolResult', props: { tool_use_id: c.id, tool: TOOL, output: { result: c.result }, isErrored: false, isExpanded: true } })
+  expect(((await ui.findAll({ type: 'Text' })) as any[]).map((t) => t.text)).toEqual(['STOCK'])
+  await ui.unmount()
+})
+
+test('while a recording masks the screen, the plate is masked too', async ($, on) => {
+  world(on, { rec: true })
+  await started($)
+  await toolCall($, { action: 'plan', goal: 'mail me@example.com', tasks: [{ title: 'read', size: 'S' }] })
+  const c = await toolCall($, { action: 'done', id: 1 })
+  const rows = await rowsOf($, c)
+  expect(rows[0].props.backgroundColor).toBe(GREEN)
+  expect(rows[0].text).not.toContain('me@example.com')
 })
 
 test('resultText reads the shapes the engine may store', () => {
