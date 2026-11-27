@@ -92,6 +92,10 @@ For `auto`, anything but `off` turns it on. `/goal clear` (or `stop`, `off`, `ca
 
 In the band, the **all tasks** button (or `g`) opens the pane. `g` is a button in the band, so it only works while the band shows; `/waypoints` always does.
 
+## What changed in 2.9.0
+
+- **A green plate marks the call that finishes the plan.** In the terminal, the `waypoints:tasks` call whose `done` leaves every counted task finished now draws one row of black bold text on a green fill, over the plan list: ` ✓ All 5 tasks done · <goal> `. Parked tasks stay out of the count and are named (`· 1 parked`), and a task Claude drops does not hold it back. A call that does not finish the plan, a repeat of `done`, and the Desktop app, VS Code, mobile, an error and the ctrl+o view keep their usual result. If Claude reopens the plan with `add` and finishes it again, the plate comes again. Only that one call is green, so the chat does not fill with it. While a recording masks the screen, the plate is masked like the rest of the mod.
+
 ## What changed in 2.8.1
 
 - **The plugin's links point at the renamed repo.** The repository was renamed from `claude-mods` to `claude-craftkits`, and `homepage` and `repository` in `plugin.json` still named the old one. Nothing in how Waypoints behaves changed. This is also the first release published to npm as `@afterever/waypoints` through trusted publishing, with no stored token.

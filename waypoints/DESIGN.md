@@ -851,3 +851,38 @@ to blank the stock result for its open chevron, and the list shows beside its vi
 which is the default.
 
 Version **2.8.0**; tests in `result.test.ts`: the full list, each readable output shape, and each case that falls through.
+
+## 2.9.0: a green plate over the call that finishes the plan
+
+**The ask.** A construction-sign prompt (the `/skins` fork's amber plate: black bold text on a solid fill) made the person want the
+mirror image when a plan completes: one green row, black text, as the final confirmation. The first idea was a plate for every
+`done`; the person weighed that against filling the chat with green and chose the final one only, so the green keeps meaning "all
+of it".
+
+**Where.** The transcript row that exists at that moment is the tool's own result, which 2.8.0 already draws in the terminal
+through a `ToolResult` hook. A mod has no way to insert a styled row of its own at `finishGoal` (a plan ends at the turn's end, and
+Claude may still `add` after the last `done`), so the plate rides on the call that makes the last counted task done.
+
+**How.** `finishPlate(goal)` in `plan.mjs` is the words: `All N tasks done · <goal title>`, with `· k parked` before the title when
+tasks are parked. It is null while any counted task is open and for a plan with no counted task, so a parked-only plan has none.
+"Counted" is `progress()`'s own rule: parked tasks wait outside the chat and dropped ones are gone, so neither blocks it.
+`serveTool` asks `finishPlate` before and after `applyAction`; only a `done` that takes it from null to a string records the plate,
+so a repeated `done` on a finished plan draws none, and a plan reopened by `add` and finished again draws a second one. The record is
+a map from `tool_use_id` to the words, which `ToolResult` carries as the same id `tool.call` got, so the hook finds its call exactly
+and never matches on text; it keeps the newest 50. The hook puts one `Text` (`backgroundColor`, bold black `color`, truncating)
+above the list rows, masked like them.
+
+**Wording.** "All 5 tasks done", not "Plan done": at the moment it prints it is true even if the plan reopens.
+
+**The green** is a fixed `#30d158` (the skins mod's cupertino `ok`) with black text. The palette's `ok` is a theme key in the
+`claude` and `mono` palettes, whose colour a skin may remap to something black text cannot sit on, so it is not used.
+
+**Left alone.** The tool's reply text, so Claude reads nothing new and the data file is unchanged. The terminal only, as 2.8.0:
+Desktop, VS Code and mobile, an error and ctrl+o keep the stock result. A reload empties the map, so a plate does not come back for
+a result drawn again after one; that is the same loss as the other in-memory notes above.
+
+**Not observed.** That `backgroundColor` paints on a `Text` inside a transcript row in a running terminal (it does in the test
+engine and in the chips of `work-report` and `prompt-upgrade`).
+
+Version **2.9.0**; tests in `plan.test.ts` (`finishPlate`: only when all are done, singular, parked, empty) and `result.test.ts`
+(the plate and its colours, not on a start, a show or a repeat, a second plate after a reopen, ctrl+o and Desktop, masking).
